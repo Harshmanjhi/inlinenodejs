@@ -1,0 +1,19 @@
+{
+    "name": "telegram-bot",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "main.js",
+    "scripts": {
+        "start": "node main.js"
+    },
+    "dependencies": {
+        "@brokerloop/ttlcache": "^3.2.3",
+        "async-lock": "^1.4.1",
+        "axios": "^1.7.7",
+        "canvas": "^2.8.0",
+        "dotenv": "^10.0.0",
+        "mongodb": "^4.17.2",
+        "node-schedule": "^2.1.1",
+        "node-telegram-bot-api": "^0.54.0"
+    }
+}
