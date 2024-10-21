@@ -61,7 +61,8 @@ app.post('/process_inline_query', async (req, res) => {
     const paginatedCharacters = characters.slice(offsetValue, offsetValue + 10);
     const nextOffset = paginatedCharacters.length === 10 ? offsetValue + 10 : '';
 
-    const results = paginatedCharacters.map(character => {
+    // Use Promise.all to handle async operations for each character
+    const results = await Promise.all(paginatedCharacters.map(async (character) => {
         const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
         const caption = `
             <b>🌸 ${character.name}</b>\n
@@ -78,9 +79,9 @@ app.post('/process_inline_query', async (req, res) => {
             caption: caption,
             parse_mode: 'HTML',
         };
-    });
-  
-  res.json({ results, next_offset: nextOffset });
+    }));
+
+    res.json({ results, next_offset: nextOffset });
 });
 
 app.listen(3000, () => {
