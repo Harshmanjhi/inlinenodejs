@@ -16,7 +16,7 @@ const MONGO_URI = 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.n
 const DB_NAME = 'gaming_totals';
 
 let db, userCollection, characterCollection;
-
+let client; // Global MongoClient variable
 // Cache setup
 const allCharactersCache = new NodeCache({ stdTTL: 36000, checkperiod: 600 });
 const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
@@ -25,24 +25,32 @@ const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
 const bot = new TelegramBot(BOT_TOKEN);
 bot.setWebHook(`${WEBHOOK_URL}/bot${BOT_TOKEN}`);
 
-// Connect to MongoDB
 async function connectToMongo() {
-  const client = new MongoClient(MONGO_URI, { useUnifiedTopology: true });
-  await client.connect();
-  db = client.db(DB_NAME);
-  userCollection = db.collection('users');
-  characterCollection = db.collection('characters');
+  if (client && client.isConnected()) {
+    console.log('MongoDB client is already connected.');
+    return;
+  }
+  try {
+    client = new MongoClient(MONGO_URI, { useUnifiedTopology: true });
+    await client.connect();
+    db = client.db(DB_NAME);
+    userCollection = db.collection('users');
+    characterCollection = db.collection('characters');
 
-  // Create indexes
-  await characterCollection.createIndex({ id: 1 });
-  await characterCollection.createIndex({ anime: 1 });
-  await characterCollection.createIndex({ img_url: 1 });
+    // Create indexes
+    await characterCollection.createIndex({ id: 1 });
+    await characterCollection.createIndex({ anime: 1 });
+    await characterCollection.createIndex({ img_url: 1 });
 
-  await userCollection.createIndex({ 'characters.id': 1 });
-  await userCollection.createIndex({ 'characters.name': 1 });
-  await userCollection.createIndex({ 'characters.img_url': 1 });
+    await userCollection.createIndex({ 'characters.id': 1 });
+    await userCollection.createIndex({ 'characters.name': 1 });
+    await userCollection.createIndex({ 'characters.img_url': 1 });
+
+    console.log('MongoDB connected successfully.');
+  } catch (error) {
+    console.error('Error connecting to MongoDB:', error);
+  }
 }
-
 // Inline query handler
 async function handleInlineQuery(query) {
   const offset = query.offset ? parseInt(query.offset) : 0;
