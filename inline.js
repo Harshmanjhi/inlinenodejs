@@ -25,7 +25,6 @@ MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
 app.post('/process_inline_query', async (req, res) => {
     const { query, offset } = req.body;
     let characters = [];
-    let allCharacters = [];
     const offsetValue = parseInt(offset || 0);
 
     if (query.startsWith('collection.')) {
@@ -41,47 +40,46 @@ app.post('/process_inline_query', async (req, res) => {
             }
 
             if (user) {
-                allCharacters = [...new Set(user.characters.map((c) => c.id))].map((id) => user.characters.find((c) => c.id === id));
+                characters = [...new Set(user.characters.map((c) => c.id))].map((id) => user.characters.find((c) => c.id === id));
                 if (searchTerms.length) {
                     const regex = new RegExp(searchTerms, 'i');
-                    allCharacters = allCharacters.filter((c) => regex.test(c.name) || regex.test(c.anime));
+                    characters = characters.filter((c) => regex.test(c.name) || regex.test(c.anime));
                 }
             }
         }
     } else {
         if (query) {
             const regex = new RegExp(query, 'i');
-            allCharacters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
+            characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
         } else {
-            allCharacters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
-            allCharactersCache.set('all_characters', allCharacters);
+            characters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
+            allCharactersCache.set('all_characters', characters);
         }
     }
 
-    characters = allCharacters.slice(offsetValue, offsetValue + 10);
-    const nextOffset = characters.length === 10 ? offsetValue + 10 : '';
+    // Slice characters for pagination
+    const paginatedCharacters = characters.slice(offsetValue, offsetValue + 10);
+    const nextOffset = paginatedCharacters.length === 10 ? offsetValue + 10 : '';
 
-    const results = await Promise.all(
-        characters.map(async (character) => {
-            const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
-            const caption = `
-                <b>🌸 ${character.name}</b>\n
-                <b>🏖️ ${character.anime}</b>\n
-                <b>🆔️: ${character.id}</b>\n\n
-                <b>🔍 Globally Guessed: ${globalCount} Times...</b>
-            `;
+    const results = paginatedCharacters.map(character => {
+        const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
+        const caption = `
+            <b>🌸 ${character.name}</b>\n
+            <b>🏖️ ${character.anime}</b>\n
+            <b>🆔️: ${character.id}</b>\n\n
+            <b>🔍 Globally Guessed: ${globalCount} Times...</b>
+        `;
 
-            return {
-                type: 'photo',
-                id: `${character.id}_${Date.now()}`,
-                photo_url: character.img_url,
-                thumb_url: character.img_url,
-                caption: caption,
-                parse_mode: 'HTML',
-            };
-        })
-    );
-
+        return {
+            type: 'photo',
+            id: `${character.id}_${Date.now()}`,
+            photo_url: character.img_url,
+            thumb_url: character.img_url,
+            caption: caption,
+            parse_mode: 'HTML',
+        };
+    });
+  
   res.json({ results, next_offset: nextOffset });
 });
 
