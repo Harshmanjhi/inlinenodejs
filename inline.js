@@ -5,7 +5,7 @@ const NodeCache = require('node-cache');
 const app = express();
 app.use(express.json());
 
-const MONGO_URI = 'your-mongo-db-uri';
+const MONGO_URI = 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 const DB_NAME = 'gaming_totals';
 let db, userCollection, characterCollection;
 
