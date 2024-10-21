@@ -22,7 +22,7 @@ MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
   .catch((err) => console.error('Error connecting to MongoDB:', err));
 
 // Inline query handler API
-app.post('/handle_inline_query', async (req, res) => {
+app.post('/process_inline_query', async (req, res) => {
     const { query, offset } = req.body;
     let characters = [];
     let allCharacters = [];
