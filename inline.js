@@ -25,8 +25,9 @@ MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
 
 // Inline query handler API
 app.post('/process_inline_query', async (req, res) => {
-    const { query } = req.body;
+    const { query, offset } = req.body;
     let characters = [];
+    const offsetValue = parseInt(offset) || 0;  // Use provided offset or default to 0
 
     // If the query starts with "collection.", handle it as a collection query
     if (query.startsWith('collection.')) {
@@ -67,8 +68,12 @@ app.post('/process_inline_query', async (req, res) => {
         }
     }
 
+    // Paginate the characters (limit to 20 per page)
+    const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
+    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : '';
+
     // Use Promise.all to handle async operations for each character
-    const results = await Promise.all(characters.map(async (character) => {
+    const results = await Promise.all(paginatedCharacters.map(async (character) => {
         const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });  // Get global count
         const caption = `
             <b>🌸 ${character.name}</b>\n
@@ -87,8 +92,8 @@ app.post('/process_inline_query', async (req, res) => {
         };
     }));
 
-    // Return the results without pagination
-    res.json({ results });
+    // Return the results and next offset for pagination
+    res.json({ results, next_offset: nextOffset });
 });
 
 // Start the server
