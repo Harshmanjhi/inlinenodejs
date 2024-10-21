@@ -6,7 +6,7 @@ const app = express();
 app.use(express.json());
 
 const MONGO_URI = 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
-const DB_NAME = 'gaming_totals';
+const DB_NAME = 'gaming_create';
 let db, userCollection, characterCollection;
 
 const allCharactersCache = new NodeCache({ stdTTL: 36000, checkperiod: 600 });
@@ -15,8 +15,8 @@ const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
 MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
   .then((client) => {
     db = client.db(DB_NAME);
-    userCollection = db.collection('users');
-    characterCollection = db.collection('characters');
+    userCollection = db.collection('gaming_totals');
+    characterCollection = db.collection('gaming_anime_characters');
     console.log('Connected to MongoDB');
   })
   .catch((err) => console.error('Error connecting to MongoDB:', err));
