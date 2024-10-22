@@ -79,29 +79,14 @@ app.post('/process_inline_query', async (req, res) => {
       const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
       const animeCharacters = await characterCollection.countDocuments({ anime: character.anime });
 
-      let caption;
-      if (query.startsWith('collection.')) {
-        const userId = query.split(' ')[0].split('.')[1];
-        const user = userCollectionCache.get(userId);
-        const userCharacterCount = user.characters.filter(c => c.id === character.id).length;
-        const userAnimeCharacters = user.characters.filter(c => c.anime === character.anime).length;
-        caption = `
-          <b>🌟 Look At <a href='tg://user?id=${user.id}'>${escapeHtml(user.first_name || user.id)}</a>'s Character 🌟</b>\n\n
-          🌸: <b>${escapeHtml(character.name)} (x${userCharacterCount})</b>\n
-          🏖️: <b>${escapeHtml(character.anime)} (${userAnimeCharacters}/${animeCharacters})</b>\n
-          <b>${escapeHtml(character.rarity || 'Unknown Rarity')}</b>\n\n
-          <b>🆔️:</b> ${escapeHtml(character.id.toString())}
-        `;
-      } else {
-        caption = `
-          <b>🌈 Look At This Character!! 🌈</b>\n\n
-          🌸: <b>${escapeHtml(character.name)}</b>\n
-          🏖️: <b>${escapeHtml(character.anime)}</b>\n
-          <b>${escapeHtml(character.rarity || 'Unknown Rarity')}</b>\n
-          🆔️: <b>${escapeHtml(character.id.toString())}</b>\n\n
-          <b>🔍 Globally Guessed: ${globalCount} Times...</b>
-        `;
-      }
+      let caption = `
+        <b>🌈 Look At This Character!! 🌈</b>\n\n
+        🌸: <b>${escapeHtml(character.name)}</b>\n
+        🏖️: <b>${escapeHtml(character.anime)}</b>\n
+        <b>${escapeHtml(character.rarity || 'Unknown Rarity')}</b>\n
+        🆔️: <b>${escapeHtml(character.id.toString())}</b>\n\n
+        <b>🔍 Globally Guessed: ${globalCount} Times...</b>
+      `;
 
       return {
         type: 'photo',
