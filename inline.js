@@ -1,6 +1,7 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const NodeCache = require('node-cache');
+const { Telegraf } = require('telegraf');
 
 const app = express();
 app.use(express.json());
@@ -31,55 +32,68 @@ MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
   })
   .catch((err) => console.error('Error connecting to MongoDB:', err));
 
-app.post('/process_inline_query', async (req, res) => {
-  try {
-    const { query, offset } = req.body;
-    const offsetValue = parseInt(offset) || 0;
-    const limit = 10;
+// Initialize Telegram Bot
+const bot = new Telegraf('YOUR_BOT_TOKEN'); // Replace with your bot token
 
-    let characters = [];
+bot.on('inline_query', async (ctx) => {
+  const query = ctx.inlineQuery.query;
+  const offset = parseInt(ctx.inlineQuery.offset) || 0;
 
-    if (query.startsWith('collection.')) {
-      const [, userId, ...searchTerms] = query.split(' ');
-      const searchQuery = searchTerms.join(' ');
+  let allCharacters = [];
 
-      if (/^\d+$/.test(userId)) {
-        let user = userCollectionCache.get(userId);
-        if (!user) {
-          user = await userCollection.findOne({ id: parseInt(userId) });
-          if (user) {
-            userCollectionCache.set(userId, user);
-          }
-        }
+  if (query.startsWith('collection.')) {
+    const [_, userId, ...searchTerms] = query.split(' ');
+    const searchQuery = searchTerms.join(' ');
 
+    if (/^\d+$/.test(userId)) {
+      let user = userCollectionCache.get(userId);
+      if (!user) {
+        user = await userCollection.findOne({ id: parseInt(userId) });
         if (user) {
-          characters = [...new Set(user.characters.map(c => c.id))]
-            .map(id => user.characters.find(c => c.id === id));
-
-          if (searchQuery) {
-            const regex = new RegExp(searchQuery, 'i');
-            characters = characters.filter(c => regex.test(c.name) || regex.test(c.anime));
-          }
+          userCollectionCache.set(userId, user);
         }
       }
-    } else {
-      if (query) {
-        const regex = new RegExp(query, 'i');
-        characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
-      } else {
-        characters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
-        allCharactersCache.set('all_characters', characters);
+
+      if (user) {
+        allCharacters = [...new Set(user.characters.map(c => c.id))]
+          .map(id => user.characters.find(c => c.id === id));
+
+        if (searchQuery) {
+          const regex = new RegExp(searchQuery, 'i');
+          allCharacters = allCharacters.filter(c => regex.test(c.name) || regex.test(c.anime));
+        }
       }
     }
+  } else {
+    if (query) {
+      const regex = new RegExp(query, 'i');
+      allCharacters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
+    } else {
+      allCharacters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
+      allCharactersCache.set('all_characters', allCharacters);
+    }
+  }
 
-    const paginatedCharacters = characters.slice(offsetValue, offsetValue + limit);
-    const nextOffset = paginatedCharacters.length === limit ? offsetValue + limit : '';
+  const characters = allCharacters.slice(offset, offset + 10);
+  const nextOffset = characters.length === 10 ? offset + 10 : '';
 
-    const results = await Promise.all(paginatedCharacters.map(async (character) => {
-      const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
-      const animeCharacters = await characterCollection.countDocuments({ anime: character.anime });
+  const results = await Promise.all(characters.map(async (character) => {
+    const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
+    const animeCharacters = await characterCollection.countDocuments({ anime: character.anime });
 
-      let caption = `
+    let caption;
+    if (query.startsWith('collection.')) {
+      const userCharacterCount = user.characters.filter(c => c.id === character.id).length;
+      const userAnimeCharacters = user.characters.filter(c => c.anime === character.anime).length;
+      caption = `
+        <b>🌟 Look At <a href='tg://user?id=${user.id}'>${escapeHtml(user.first_name || user.id)}</a>'s Character 🌟</b>\n\n
+        🌸: <b>${escapeHtml(character.name)} (x${userCharacterCount})</b>\n
+        🏖️: <b>${escapeHtml(character.anime)} (${userAnimeCharacters}/${animeCharacters})</b>\n
+        <b>${escapeHtml(character.rarity || 'Unknown Rarity')}</b>\n\n
+        <b>🆔️:</b> ${escapeHtml(character.id.toString())}
+      `;
+    } else {
+      caption = `
         <b>🌈 Look At This Character!! 🌈</b>\n\n
         🌸: <b>${escapeHtml(character.name)}</b>\n
         🏖️: <b>${escapeHtml(character.anime)}</b>\n
@@ -87,24 +101,22 @@ app.post('/process_inline_query', async (req, res) => {
         🆔️: <b>${escapeHtml(character.id.toString())}</b>\n\n
         <b>🔍 Globally Guessed: ${globalCount} Times...</b>
       `;
+    }
 
-      return {
-        type: 'photo',
-        id: `${character.id}_${Date.now()}`,
-        photo_url: character.img_url,
-        thumb_url: character.img_url,
-        caption: caption,
-        parse_mode: 'HTML',
-      };
-    }));
+    return {
+      type: 'photo',
+      id: `${character.id}_${Date.now()}`,
+      photo_url: character.img_url,
+      thumb_url: character.img_url,
+      caption: caption,
+      parse_mode: 'HTML',
+    };
+  }));
 
-    res.json({ results, next_offset: nextOffset });
-  } catch (error) {
-    console.error('Error processing query:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
-  }
+  await ctx.answerInlineQuery(results, { next_offset: nextOffset });
 });
 
+// Escape HTML function
 function escapeHtml(unsafe) {
   return unsafe
     .replace(/&/g, "&amp;")
@@ -114,6 +126,7 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
-app.listen(3000, () => {
-  console.log('Server running on port 3000');
+// Start the bot
+bot.launch().then(() => {
+  console.log('Bot is running...');
 });
