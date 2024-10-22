@@ -86,7 +86,6 @@ app.post('/process_inline_query', async (req, res) => {
             type: 'photo',
             id: `${character.id}_${Date.now()}`,
             photo_url: character.img_url,
-            thumb_url: character.img_url,
             caption: caption,
             parse_mode: 'HTML',
         };
