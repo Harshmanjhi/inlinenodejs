@@ -45,6 +45,13 @@ app.post('/process_inline_query', async (req, res) => {
                 }
 
                 if (user) {
+                    // Check if the user has any characters
+                    if (!user.characters || user.characters.length === 0) {
+                        console.log(`User ${userId} has no characters.`);
+                        await res.json({ results: [], next_offset: null }); // Return empty results
+                        return;
+                    }
+
                     // Filter characters based on the user's collection
                     characters = [...new Set(user.characters.map(c => c.id))].map(id => user.characters.find(c => c.id === id));
 
@@ -52,6 +59,13 @@ app.post('/process_inline_query', async (req, res) => {
                         const regex = new RegExp(searchTerms, 'i');
                         characters = characters.filter(c => regex.test(c.name) || regex.test(c.anime));
                     }
+
+                    // Debugging log
+                    console.log(`Found ${characters.length} characters for user ${userId}.`);
+                } else {
+                    console.log(`User ${userId} not found.`);
+                    await res.json({ results: [], next_offset: null }); // Return empty results
+                    return;
                 }
             }
         } else {
@@ -69,6 +83,13 @@ app.post('/process_inline_query', async (req, res) => {
         // Paginate characters: Fetching the next set of characters
         const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
         const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : null; // Use null if no more characters
+
+        // If no characters were found, log the event and return
+        if (paginatedCharacters.length === 0) {
+            console.log("No characters found for the given query or user collection.");
+            await res.json({ results: [], next_offset: null }); // Return empty results
+            return;
+        }
 
         // Process each character to prepare results
         const results = await Promise.all(paginatedCharacters.map(async (character) => {
