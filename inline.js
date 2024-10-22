@@ -75,6 +75,8 @@ app.post('/process_inline_query', async (req, res) => {
     // Use Promise.all to handle async operations for each character
     const results = await Promise.all(paginatedCharacters.map(async (character) => {
         const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });  // Get global count
+        const imgUrl = character.img_url || 'https://files.catbox.moe/i7b1qk.jpg';  // Fallback image
+      
         const caption = `
             <b>🌸 ${character.name}</b>\n
             <b>🏖️ ${character.anime}</b>\n
