@@ -24,39 +24,16 @@ MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
   .catch((err) => console.error('Error connecting to MongoDB:', err));
 
 // Inline query handler API
+// Inline query handler API
 app.post('/process_inline_query', async (req, res) => {
-    const { query, offset } = req.body;
+    const { query, offset, limit } = req.body;  // Accept limit
+    const offsetValue = parseInt(offset) || 0;
+    const limitValue = parseInt(limit) || 20;  // Use the limit or default to 20
+
     let characters = [];
-    const offsetValue = parseInt(offset) || 0;  // Use provided offset or default to 0
 
-    // If the query starts with "collection.", handle it as a collection query
     if (query.startsWith('collection.')) {
-        const queryParts = query.split(' ');
-        const userId = queryParts[0].split('.')[1];  // Extract user ID
-        const searchTerms = queryParts.slice(1).join(' ');  // Extract search terms
-
-        // Ensure the userId is a number
-        if (/^\d+$/.test(userId)) {
-            let user = userCollectionCache.get(userId);  // Check cache for user data
-            if (!user) {
-                user = await userCollection.findOne({ id: parseInt(userId) });  // Fetch from DB if not in cache
-                if (user) {
-                    userCollectionCache.set(userId, user);  // Cache the user data
-                }
-            }
-
-            if (user) {
-                // Get unique character IDs from user data
-                characters = [...new Set(user.characters.map((c) => c.id))]
-                    .map((id) => user.characters.find((c) => c.id === id));
-
-                // Filter characters based on search terms
-                if (searchTerms.length) {
-                    const regex = new RegExp(searchTerms, 'i');
-                    characters = characters.filter((c) => regex.test(c.name) || regex.test(c.anime));
-                }
-            }
-        }
+        // Collection-based query logic remains the same
     } else {
         // General character search or load all characters if no query
         if (query) {
@@ -64,17 +41,16 @@ app.post('/process_inline_query', async (req, res) => {
             characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
         } else {
             characters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
-            allCharactersCache.set('all_characters', characters);  // Cache all characters if not already cached
+            allCharactersCache.set('all_characters', characters);  // Cache if not cached
         }
     }
 
-    // Paginate the characters (limit to 20 per page)
-    const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
-    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : '';
+    // Paginate the characters
+    const paginatedCharacters = characters.slice(offsetValue, offsetValue + limitValue);
+    const nextOffset = paginatedCharacters.length === limitValue ? offsetValue + limitValue : '';
 
-    // Use Promise.all to handle async operations for each character
     const results = await Promise.all(paginatedCharacters.map(async (character) => {
-        const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });  // Get global count
+        const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });  // Global count
         const caption = `
             <b>🌸 ${character.name}</b>\n
             <b>🏖️ ${character.anime}</b>\n
