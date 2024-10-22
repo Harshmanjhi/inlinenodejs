@@ -5,8 +5,8 @@ const NodeCache = require('node-cache');
 const app = express();
 app.use(express.json());
 
-const MONGO_URI = 'mongodb+srv://your_username:your_password@your_cluster.mongodb.net/your_database?retryWrites=true&w=majority';
-const DB_NAME = 'your_database_name';
+const MONGO_URI = 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const DB_NAME = 'gaming_create';
 let db, userCollection, characterCollection;
 
 // Cache setup
@@ -17,8 +17,8 @@ const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
 MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
   .then((client) => {
     db = client.db(DB_NAME);
-    userCollection = db.collection('user_collection');
-    characterCollection = db.collection('characters');
+    userCollection = db.collection('gaming_totals');
+    characterCollection = db.collection('gaming_anime_characters');
     console.log('Connected to MongoDB');
 
     // Create indexes
