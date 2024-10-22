@@ -1,7 +1,6 @@
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const NodeCache = require('node-cache');
-const { Telegraf } = require('telegraf');
 
 const app = express();
 app.use(express.json());
@@ -10,9 +9,9 @@ const MONGO_URI = 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.n
 const DB_NAME = 'gaming_create';
 let db, userCollection, characterCollection;
 
-// Cache setup
-const allCharactersCache = new NodeCache({ stdTTL: 36000, checkperiod: 600 });
-const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
+// Cache setup: cache for all characters and user collection data
+const allCharactersCache = new NodeCache({ stdTTL: 36000, checkperiod: 600 });  
+const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });    
 
 // Connect to MongoDB
 MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
@@ -21,112 +20,83 @@ MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
     userCollection = db.collection('gaming_totals');
     characterCollection = db.collection('gaming_anime_characters');
     console.log('Connected to MongoDB');
-
-    // Create indexes
-    characterCollection.createIndex({ id: 1 });
-    characterCollection.createIndex({ anime: 1 });
-    characterCollection.createIndex({ img_url: 1 });
-    userCollection.createIndex({ 'characters.id': 1 });
-    userCollection.createIndex({ 'characters.name': 1 });
-    userCollection.createIndex({ 'characters.img_url': 1 });
   })
   .catch((err) => console.error('Error connecting to MongoDB:', err));
 
-// Initialize Telegram Bot
-const bot = new Telegraf('YOUR_BOT_TOKEN'); // Replace with your bot token
+// Inline query handler API
+app.post('/process_inline_query', async (req, res) => {
+    const { query, offset } = req.body;
+    let characters = [];
+    const offsetValue = parseInt(offset) || 0;  // Use provided offset or default to 0
 
-bot.on('inline_query', async (ctx) => {
-  const query = ctx.inlineQuery.query;
-  const offset = parseInt(ctx.inlineQuery.offset) || 0;
-
-  let allCharacters = [];
-
-  if (query.startsWith('collection.')) {
-    const [_, userId, ...searchTerms] = query.split(' ');
-    const searchQuery = searchTerms.join(' ');
-
-    if (/^\d+$/.test(userId)) {
-      let user = userCollectionCache.get(userId);
-      if (!user) {
-        user = await userCollection.findOne({ id: parseInt(userId) });
-        if (user) {
-          userCollectionCache.set(userId, user);
-        }
-      }
-
-      if (user) {
-        allCharacters = [...new Set(user.characters.map(c => c.id))]
-          .map(id => user.characters.find(c => c.id === id));
-
-        if (searchQuery) {
-          const regex = new RegExp(searchQuery, 'i');
-          allCharacters = allCharacters.filter(c => regex.test(c.name) || regex.test(c.anime));
-        }
-      }
-    }
-  } else {
-    if (query) {
-      const regex = new RegExp(query, 'i');
-      allCharacters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
-    } else {
-      allCharacters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
-      allCharactersCache.set('all_characters', allCharacters);
-    }
-  }
-
-  const characters = allCharacters.slice(offset, offset + 10);
-  const nextOffset = characters.length === 10 ? offset + 10 : '';
-
-  const results = await Promise.all(characters.map(async (character) => {
-    const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
-    const animeCharacters = await characterCollection.countDocuments({ anime: character.anime });
-
-    let caption;
+    // If the query starts with "collection.", handle it as a collection query
     if (query.startsWith('collection.')) {
-      const userCharacterCount = user.characters.filter(c => c.id === character.id).length;
-      const userAnimeCharacters = user.characters.filter(c => c.anime === character.anime).length;
-      caption = `
-        <b>🌟 Look At <a href='tg://user?id=${user.id}'>${escapeHtml(user.first_name || user.id)}</a>'s Character 🌟</b>\n\n
-        🌸: <b>${escapeHtml(character.name)} (x${userCharacterCount})</b>\n
-        🏖️: <b>${escapeHtml(character.anime)} (${userAnimeCharacters}/${animeCharacters})</b>\n
-        <b>${escapeHtml(character.rarity || 'Unknown Rarity')}</b>\n\n
-        <b>🆔️:</b> ${escapeHtml(character.id.toString())}
-      `;
+        const queryParts = query.split(' ');
+        const userId = queryParts[0].split('.')[1];  // Extract user ID
+        const searchTerms = queryParts.slice(1).join(' ');  // Extract search terms
+
+        // Ensure the userId is a number
+        if (/^\d+$/.test(userId)) {
+            let user = userCollectionCache.get(userId);  // Check cache for user data
+            if (!user) {
+                user = await userCollection.findOne({ id: parseInt(userId) });  // Fetch from DB if not in cache
+                if (user) {
+                    userCollectionCache.set(userId, user);  // Cache the user data
+                }
+            }
+
+            if (user) {
+                // Get unique character IDs from user data
+                characters = [...new Set(user.characters.map((c) => c.id))]
+                    .map((id) => user.characters.find((c) => c.id === id));
+
+                // Filter characters based on search terms
+                if (searchTerms.length) {
+                    const regex = new RegExp(searchTerms, 'i');
+                    characters = characters.filter((c) => regex.test(c.name) || regex.test(c.anime));
+                }
+            }
+        }
     } else {
-      caption = `
-        <b>🌈 Look At This Character!! 🌈</b>\n\n
-        🌸: <b>${escapeHtml(character.name)}</b>\n
-        🏖️: <b>${escapeHtml(character.anime)}</b>\n
-        <b>${escapeHtml(character.rarity || 'Unknown Rarity')}</b>\n
-        🆔️: <b>${escapeHtml(character.id.toString())}</b>\n\n
-        <b>🔍 Globally Guessed: ${globalCount} Times...</b>
-      `;
+        // General character search or load all characters if no query
+        if (query) {
+            const regex = new RegExp(query, 'i');
+            characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
+        } else {
+            characters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
+            allCharactersCache.set('all_characters', characters);  // Cache all characters if not already cached
+        }
     }
 
-    return {
-      type: 'photo',
-      id: `${character.id}_${Date.now()}`,
-      photo_url: character.img_url,
-      thumb_url: character.img_url,
-      caption: caption,
-      parse_mode: 'HTML',
-    };
-  }));
+    // Paginate the characters (limit to 20 per page)
+    const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
+    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : '';
 
-  await ctx.answerInlineQuery(results, { next_offset: nextOffset });
+    // Use Promise.all to handle async operations for each character
+    const results = await Promise.all(paginatedCharacters.map(async (character) => {
+        const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });  // Get global count
+        const caption = `
+            <b>🌸 ${character.name}</b>\n
+            <b>🏖️ ${character.anime}</b>\n
+            <b>🆔️: ${character.id}</b>\n\n
+            <b>🔍 Globally Guessed: ${globalCount} Times...</b>
+        `;
+
+        return {
+            type: 'photo',
+            id: `${character.id}_${Date.now()}`,
+            photo_url: character.img_url,
+            thumb_url: character.img_url,
+            caption: caption,
+            parse_mode: 'HTML',
+        };
+    }));
+
+    // Return the results and next offset for pagination
+    res.json({ results, next_offset: nextOffset });
 });
 
-// Escape HTML function
-function escapeHtml(unsafe) {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-// Start the bot
-bot.launch().then(() => {
-  console.log('Bot is running...');
+// Start the server
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
 });
