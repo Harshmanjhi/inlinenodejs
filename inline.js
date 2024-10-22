@@ -9,9 +9,11 @@ const MONGO_URI = 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.n
 const DB_NAME = 'gaming_create';
 let db, userCollection, characterCollection;
 
+// Caches for user and all characters
 const allCharactersCache = new NodeCache({ stdTTL: 36000, checkperiod: 600 });
 const userCollectionCache = new NodeCache({ stdTTL: 60, checkperiod: 10 });
 
+// Connect to MongoDB
 MongoClient.connect(MONGO_URI, { useUnifiedTopology: true })
   .then((client) => {
     db = client.db(DB_NAME);
@@ -26,46 +28,49 @@ app.post('/process_inline_query', async (req, res) => {
     let characters = [];
     const offsetValue = parseInt(offset) || 0;
 
-    // If the query starts with 'collection.', handle specific user collections
-    if (query.startsWith('collection.')) {
-        const queryParts = query.split(' ');
-        const userId = queryParts[0].split('.')[1];  
-        const searchTerms = queryParts.slice(1).join(' '); 
-
-        if (/^\d+$/.test(userId)) {
-            let user = userCollectionCache.get(userId);
-            if (!user) {
-                user = await userCollection.findOne({ id: parseInt(userId) });
-                if (user) {
-                    userCollectionCache.set(userId, user);
-                }
-            }
-
-            if (user) {
-                characters = [...new Set(user.characters.map(c => c.id))].map(id => user.characters.find(c => c.id === id));
-
-                if (searchTerms.length) {
-                    const regex = new RegExp(searchTerms, 'i');
-                    characters = characters.filter(c => regex.test(c.name) || regex.test(c.anime));
-                }
-            }
-        }
-    } else {
-        // Handle general queries
-        if (query) {
-            const regex = new RegExp(query, 'i');
-            characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
-        } else {
-            characters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
-            allCharactersCache.set('all_characters', characters);
-        }
-    }
-
-    // Paginate characters: Fetching the next set of characters
-    const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
-    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : null; // Use null if no more characters
-
     try {
+        // Check for specific user collections
+        if (query.startsWith('collection.')) {
+            const queryParts = query.split(' ');
+            const userId = queryParts[0].split('.')[1];  
+            const searchTerms = queryParts.slice(1).join(' '); 
+
+            if (/^\d+$/.test(userId)) {
+                let user = userCollectionCache.get(userId);
+                if (!user) {
+                    user = await userCollection.findOne({ id: parseInt(userId) });
+                    if (user) {
+                        userCollectionCache.set(userId, user);
+                    }
+                }
+
+                if (user) {
+                    // Filter characters based on the user's collection
+                    characters = [...new Set(user.characters.map(c => c.id))].map(id => user.characters.find(c => c.id === id));
+
+                    if (searchTerms.length) {
+                        const regex = new RegExp(searchTerms, 'i');
+                        characters = characters.filter(c => regex.test(c.name) || regex.test(c.anime));
+                    }
+                }
+            }
+        } else {
+            // Handle general queries
+            if (query) {
+                const regex = new RegExp(query, 'i');
+                characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
+            } else {
+                // If no query, return all characters from cache or DB
+                characters = allCharactersCache.get('all_characters') || await characterCollection.find({}).toArray();
+                allCharactersCache.set('all_characters', characters);
+            }
+        }
+
+        // Paginate characters: Fetching the next set of characters
+        const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
+        const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : null; // Use null if no more characters
+
+        // Process each character to prepare results
         const results = await Promise.all(paginatedCharacters.map(async (character) => {
             const globalCount = await userCollection.countDocuments({ 'characters.id': character.id });
             const imgUrl = character.img_url || 'https://files.catbox.moe/ktivgb.png';
@@ -87,6 +92,7 @@ app.post('/process_inline_query', async (req, res) => {
             };
         }));
 
+        // Send the response
         res.json({ results, next_offset: nextOffset });
     } catch (error) {
         console.error('Error processing characters:', error);
@@ -94,6 +100,7 @@ app.post('/process_inline_query', async (req, res) => {
     }
 });
 
+// Start the server
 app.listen(3000, () => {
     console.log('Server running on port 3000');
 });
