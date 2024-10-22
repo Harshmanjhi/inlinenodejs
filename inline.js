@@ -26,6 +26,7 @@ app.post('/process_inline_query', async (req, res) => {
     let characters = [];
     const offsetValue = parseInt(offset) || 0;
 
+    // If the query starts with 'collection.', handle specific user collections
     if (query.startsWith('collection.')) {
         const queryParts = query.split(' ');
         const userId = queryParts[0].split('.')[1];  
@@ -50,6 +51,7 @@ app.post('/process_inline_query', async (req, res) => {
             }
         }
     } else {
+        // Handle general queries
         if (query) {
             const regex = new RegExp(query, 'i');
             characters = await characterCollection.find({ $or: [{ name: regex }, { anime: regex }] }).toArray();
@@ -59,9 +61,9 @@ app.post('/process_inline_query', async (req, res) => {
         }
     }
 
-    // Implement pagination
+    // Paginate characters: Fetching the next set of characters
     const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
-    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : null; // Use null for no more data
+    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : null; // Use null if no more characters
 
     try {
         const results = await Promise.all(paginatedCharacters.map(async (character) => {
