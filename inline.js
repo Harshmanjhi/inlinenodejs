@@ -41,8 +41,7 @@ app.post('/process_inline_query', async (req, res) => {
             }
 
             if (user) {
-                characters = [...new Set(user.characters.map(c => c.id))]
-                    .map(id => user.characters.find(c => c.id === id));
+                characters = [...new Set(user.characters.map(c => c.id))].map(id => user.characters.find(c => c.id === id));
 
                 if (searchTerms.length) {
                     const regex = new RegExp(searchTerms, 'i');
@@ -60,8 +59,9 @@ app.post('/process_inline_query', async (req, res) => {
         }
     }
 
+    // Implement pagination
     const paginatedCharacters = characters.slice(offsetValue, offsetValue + 20);
-    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : '';
+    const nextOffset = paginatedCharacters.length === 20 ? offsetValue + 20 : null; // Use null for no more data
 
     try {
         const results = await Promise.all(paginatedCharacters.map(async (character) => {
