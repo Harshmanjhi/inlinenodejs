@@ -2,7 +2,7 @@ const { Markup } = require('telegraf');
 const { escape } = require('html-entities');
 const random = require('random');
 const axios = require('axios');
-const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID, PHOTO_URL, userCollection } = process.env;
+const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID, PHOTO_URL } = process.env;
 
 // Upload file to Catbox
 const uploadToCatbox = async (filePath) => {
@@ -55,7 +55,7 @@ const start = async (ctx) => {
     const checkMsg = await ctx.reply("🔍...");
 
     // Step 3: Check if user exists in MongoDB
-    let userData = await userCollection.findOne({ _id: userId });
+    let userData = await destinationCollection.findOne({ _id: userId });
 
     if (!userData) {
         // Step 4: Update message
@@ -66,7 +66,7 @@ const start = async (ctx) => {
         const profileLink = profilePhoto ? profilePhoto : "No profile photo available";
 
         // Insert new user data
-        await userCollection.insertOne({
+        await destinationCollection.insertOne({
             _id: userId,
             first_name: firstName,
             username: username,
