@@ -50,57 +50,58 @@ const start = async (ctx) => {
     const firstName = user.first_name;
     const username = user.username;
 
-    // Step 1: Starting message
-    await ctx.reply("🚀...");
+    try {
+        // Step 1: Starting message
+        await ctx.reply("🚀...");
 
-    // Step 2: Checking message
-    const checkMsg = await ctx.telegram.sendMessage(ctx.chat.id, "🔍");
+        // Step 2: Checking message
+        const checkMsg = await ctx.telegram.sendMessage(ctx.chat.id, "🔍");
 
-    // Step 3: Check if user exists in MongoDB
-    let userData = await ctx.db.destinationCollection.findOne({ _id: userId });
+        // Step 3: Check if user exists in MongoDB
+        let userData = await ctx.db.destinationCollection.findOne({ _id: userId });
 
-    if (!userData) {
-        // Step 4: Update message
-        await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "✨");
-        
-        // Download and upload profile photo
-        const profilePhoto = await downloadProfilePhoto(ctx, userId);
-        const profileLink = profilePhoto ? profilePhoto : "No profile photo available";
+        if (!userData) {
+            // Step 4: Update message
+            await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "✨");
 
-        // Insert new user data
-        await ctx.db.destinationCollection.insertOne({
-            _id: userId,
-            first_name: firstName,
-            username: username,
-            profile_link: profileLink
-        });
+            // Download and upload profile photo
+            const profilePhoto = await downloadProfilePhoto(ctx, userId);
+            const profileLink = profilePhoto ? profilePhoto : "No profile photo available";
 
-        await ctx.telegram.sendMessage(
-            GROUP_ID,
-            `🎉 New adventurer joined the quest!\nUser: <a href='tg://user?id=${userId}'>${escape(firstName)}</a>`,
-            { parse_mode: 'HTML' }
-        );
-    } else {
-        // Update existing user data if necessary
-        if (userData.first_name !== firstName || userData.username !== username) {
-            await userCollection.updateOne(
-                { _id: userId },
-                { $set: { first_name: firstName, username: username } }
+            // Insert new user data
+            await ctx.db.destinationCollection.insertOne({
+                _id: userId,
+                first_name: firstName,
+                username: username,
+                profile_link: profileLink
+            });
+
+            await ctx.telegram.sendMessage(
+                GROUP_ID,
+                `🎉 New adventurer joined the quest!\nUser: <a href='tg://user?id=${userId}'>${escape(firstName)}</a>`,
+                { parse_mode: 'HTML' }
             );
+        } else {
+            // Update existing user data if necessary
+            if (userData.first_name !== firstName || userData.username !== username) {
+                await ctx.db.destinationCollection.updateOne(
+                    { _id: userId },
+                    { $set: { first_name: firstName, username: username } }
+                );
+            }
         }
-    }
 
-    // Step 5: Complete message
-    await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "🌟");
+        // Step 5: Complete message
+        await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "🌟");
 
-    // Final step: Send the main message
-    const keyboard = Markup.inlineKeyboard([
-        [Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${BOT_USERNAME}?startgroup=new`)],
-        [Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
-         Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)]
-    ]);
+        // Final step: Send the main message
+        const keyboard = Markup.inlineKeyboard([
+            [Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${BOT_USERNAME}?startgroup=new`)],
+            [Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
+             Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)]
+        ]);
 
-    await ctx.telegram.sendPhoto(
+        await ctx.telegram.sendPhoto(
             ctx.chat.id,
             PHOTO_URL,
             {
