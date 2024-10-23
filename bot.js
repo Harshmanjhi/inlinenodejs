@@ -499,7 +499,6 @@ bot.use((ctx, next) => {
 });
 
 // *
-bot.command('start', (ctx) => ctx.reply('Welcome! Use /help to see available commands.'));
 bot.command(['guess', 'protecc', 'collect', 'grab', 'hunt'], guessCommand);
 bot.command('fav', favCommand);
 bot.command('now', nowCommand);
