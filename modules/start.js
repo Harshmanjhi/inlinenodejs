@@ -100,13 +100,12 @@ const start = async (ctx) => {
          Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)]
     ]);
 
-    try {
     await ctx.telegram.sendPhoto(
-        ctx.chat.id,
-        PHOTO_URL,
-        {
-            caption: 
-🎮 ***Welcome to Epic Arena!***
+            ctx.chat.id,
+            PHOTO_URL,
+            {
+                caption: 
+`🎮 ***Welcome to Epic Arena!***
 
 Hey Adventurer! 👋 Ready for a thrilling quest?
 
@@ -122,11 +121,14 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 
 🏆 Compete, collect, and rise to the top!
 
-Let's make your group the ultimate gaming hub! 🚀
-            ,
-            reply_markup: keyboard
-        }
-    );
+Let's make your group the ultimate gaming hub! 🚀`,
+                reply_markup: keyboard
+            }
+        );
+    } catch (error) {
+        console.error(`Error in start command: ${error.message}`);
+        await ctx.reply("An error occurred while processing your request.");
+    }
 };
 
 module.exports = {
