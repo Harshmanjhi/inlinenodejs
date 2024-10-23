@@ -242,8 +242,7 @@ async function guessCommand(ctx) {
             { parse_mode:  'HTML', ...keyboard }
         );
 
-        // Update statistics
-        await updateStatistics(userId, chatId, ctx);
+        // Update statistic
     } else {
         await ctx.reply('❌ Not quite right, brave guesser! Try again and unveil the mystery character! 🕵️‍♂️');
     }
