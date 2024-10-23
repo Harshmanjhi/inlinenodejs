@@ -1,8 +1,7 @@
 const { Markup } = require('telegraf');
 const { escape } = require('html-entities');
-const random = require('random');
 const axios = require('axios');
-const fs = require('fs'); // Make sure to include this if you use fs
+const fs = require('fs');
 const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID } = process.env;
 
 const PHOTO_URL = 'https://envs.sh/A2J.jpg'; // img
@@ -101,7 +100,8 @@ const start = async (ctx) => {
             [
                 Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
                 Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)
-            ]
+            ],
+            [Markup.button.callback("✨ View Harem", `harem:${userId}`)] // Add this line for harem button
         ]);
 
         // Send photo with caption and inline keyboard
