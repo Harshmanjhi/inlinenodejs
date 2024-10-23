@@ -4,7 +4,8 @@ const axios = require('axios');
 const sharp = require('sharp');
 const AsyncLock = require('async-lock');
 const { harem, haremCallback } = require('./modules/harem');
-const { inlinequery } = require('./modules/inline');
+const { inlineQuery } = require('./modules/inline');
+const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument } = require('./modules/top');
 
 require('dotenv').config();
 
@@ -479,16 +480,6 @@ async function updateGroupStatistics(userId, chatId, ctx) {
     }
 }
 
-// Uptime check function
-async function checkUptime() {
-    try {
-        const response = await axios.get(URL);
-        let message = response.status === 200 ? "Your bot is UP!" : `Your bot is DOWN with status code ${response.status}`;
-        await bot.telegram.sendMessage(CHAT_ID, message);
-    } catch (e) {
-        console.error(`Error checking bot uptime: ${e}`);
-    }
-}
 
 bot.use((ctx, next) => {
     ctx.db = {
@@ -499,12 +490,11 @@ bot.use((ctx, next) => {
         destinationCollection,
         destinationCharCollection,
         collection: destinationCharCollection
-        
     };
     return next();
 });
 
-
+// Command registrations
 bot.command('start', (ctx) => ctx.reply('Welcome! Use /help to see available commands.'));
 bot.command(['guess', 'protecc', 'collect', 'grab', 'hunt'], guessCommand);
 bot.command('fav', favCommand);
@@ -512,8 +502,15 @@ bot.command('now', nowCommand);
 bot.command(['harem', 'collection'], (ctx) => harem(ctx));
 bot.action(/^harem:/, haremCallback);
 
+// Register command handlers
+bot.command('ctop', ctop);
+bot.command('TopGroups', globalLeaderboard);
+bot.command('stats', stats);
+bot.command('list', sendUsersDocument);
+bot.command('groups', sendGroupsDocument);
+
 // Inline query handler
-bot.on('inline_query', inlinequery);
+bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 
 // Handle all messages
 bot.on('message', messageCounter);
