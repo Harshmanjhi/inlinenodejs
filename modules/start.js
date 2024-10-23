@@ -2,7 +2,8 @@ const { Markup } = require('telegraf');
 const { escape } = require('html-entities');
 const random = require('random');
 const axios = require('axios');
-const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID, } = process.env;
+const fs = require('fs'); // Make sure to include this if you use fs
+const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID } = process.env;
 
 const PHOTO_URL = 'https://envs.sh/A2J.jpg'; // img
 
@@ -97,16 +98,15 @@ const start = async (ctx) => {
         // Final step: Send the main message
         const keyboard = Markup.inlineKeyboard([
             [Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${BOT_USERNAME}?startgroup=new`)],
-            [Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
-             Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)]
+            [
+                Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
+                Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)
+            ]
         ]);
 
-        await ctx.telegram.sendPhoto(
-            ctx.chat.id,
-            PHOTO_URL,
-            {
-                caption: 
-`🎮 ***Welcome to Epic Arena!***
+        // Send photo with caption and inline keyboard
+        await ctx.telegram.sendPhoto(ctx.chat.id, PHOTO_URL, {
+            caption: `🎮 ***Welcome to Epic Arena!***
 
 Hey Adventurer! 👋 Ready for a thrilling quest?
 
@@ -123,9 +123,8 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 🏆 Compete, collect, and rise to the top!
 
 Let's make your group the ultimate gaming hub! 🚀`,
-                reply_markup: keyboard
-            }
-        );
+            reply_markup: keyboard
+        });
     } catch (error) {
         console.error(`Error in start command: ${error.message}`);
         await ctx.reply("An error occurred while processing your request.");
@@ -135,4 +134,3 @@ Let's make your group the ultimate gaming hub! 🚀`,
 module.exports = {
     start,
 };
-
