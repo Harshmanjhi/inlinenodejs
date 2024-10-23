@@ -123,7 +123,7 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 🏆 Compete, collect, and rise to the top!
 
 Let's make your group the ultimate gaming hub! 🚀`,
-            reply_markup: keyboard
+            reply_markup: keyboard // Make sure to use reply_markup
         });
     } catch (error) {
         console.error(`Error in start command: ${error.message}`);
