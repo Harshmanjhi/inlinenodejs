@@ -92,7 +92,6 @@ const start = async (ctx) => {
     await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "🌟");
 
     // Final step: Send the main message
-    const photoUrl = PHOTO_URL[Math.floor(Math.random() * PHOTO_URL.length)];
     const keyboard = Markup.inlineKeyboard([
         [Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${BOT_USERNAME}?startgroup=new`)],
         [Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
@@ -101,7 +100,7 @@ const start = async (ctx) => {
 
     await ctx.telegram.sendPhoto(
         ctx.chat.id,
-        photoUrl,
+        PHOTO_URL,
         {
             caption: `
 🎮 ***Welcome to Epic Arena!***
