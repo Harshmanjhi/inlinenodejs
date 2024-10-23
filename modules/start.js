@@ -49,17 +49,17 @@ const start = async (ctx) => {
     const username = user.username;
 
     // Step 1: Starting message
-    await ctx.reply("🚀...");
+    await ctx.reply("🚀");
 
     // Step 2: Checking message
-    const checkMsg = await ctx.reply("🔍...");
+    const checkMsg = await ctx.reply("🔍");
 
     // Step 3: Check if user exists in MongoDB
     let userData = await ctx.db.destinationCollection.findOne({ _id: userId });
 
     if (!userData) {
         // Step 4: Update message
-        await checkMsg.editText("✨...");
+        await checkMsg.editMessageText("✨");
 
         // Download and upload profile photo
         const profilePhoto = await downloadProfilePhoto(ctx, userId);
@@ -89,7 +89,7 @@ const start = async (ctx) => {
     }
 
     // Step 5: Complete message
-    await checkMsg.editText("🌟");
+    await checkMsg.editMessageText("🌐");
 
     // Final step: Send the main message
     const photoUrl = random.choice(PHOTO_URL);
