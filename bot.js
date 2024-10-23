@@ -7,6 +7,7 @@ const AsyncLock = require('async-lock');
 const { harem, haremCallback } = require('./modules/harem');
 const { inlineQuery } = require('./modules/inline');
 const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument } = require('./modules/top');
+const path = require('path'); 
 const app = express();
 const port = 3000;  // Hardcoded port number
 
@@ -519,7 +520,7 @@ bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 bot.on('message', messageCounter);
 
 app.get('/', (req, res) => {
-    res.sendFile('index.html');
+    res.sendFile(path.join(__dirname, 'index.html')); // Serve index.html from the same directory
 });
 
 // Start the Express server with the hardcoded port
