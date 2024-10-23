@@ -519,7 +519,7 @@ bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 bot.on('message', messageCounter);
 
 app.get('/', (req, res) => {
-    res.send('Bot is running');
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Start the Express server with the hardcoded port
