@@ -2,7 +2,9 @@ const { Markup } = require('telegraf');
 const { escape } = require('html-entities');
 const random = require('random');
 const axios = require('axios');
-const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID, PHOTO_URL } = process.env;
+const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID, } = process.env;
+
+const PHOTO_URL = 'https://envs.sh/A2J.jpg'; // img
 
 // Upload file to Catbox
 const uploadToCatbox = async (filePath) => {
