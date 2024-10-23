@@ -55,7 +55,7 @@ const start = async (ctx) => {
     const checkMsg = await ctx.reply("🔍...");
 
     // Step 3: Check if user exists in MongoDB
-    let userData = await destinationCollection.findOne({ _id: userId });
+    let userData = await ctx.db.destinationCollection.findOne({ _id: userId });
 
     if (!userData) {
         // Step 4: Update message
@@ -66,7 +66,7 @@ const start = async (ctx) => {
         const profileLink = profilePhoto ? profilePhoto : "No profile photo available";
 
         // Insert new user data
-        await destinationCollection.insertOne({
+        await ctx.db.destinationCollection.insertOne({
             _id: userId,
             first_name: firstName,
             username: username,
