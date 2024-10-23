@@ -100,11 +100,13 @@ const start = async (ctx) => {
          Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)]
     ]);
 
+    try {
     await ctx.telegram.sendPhoto(
         ctx.chat.id,
         PHOTO_URL,
         {
             caption: `
+ `
 🎮 ***Welcome to Epic Arena!***
 
 Hey Adventurer! 👋 Ready for a thrilling quest?
