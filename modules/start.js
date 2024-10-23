@@ -94,9 +94,9 @@ const start = async (ctx) => {
         // Step 5: Complete message
         await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "🌟");
 
-    const url_button1 = Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${botUsername}?startgroup=new`);
-    const url_button2 = Markup.button.url("💬 SUPPORT", `https://t.me/${supportChat}`);
-    const url_button3 = Markup.button.url("📢 UPDATES", `https://t.me/${updateChat}`);
+    const url_button1 = Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${BOT_USERNAME}?startgroup=new`);
+    const url_button2 = Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`);
+    const url_button3 = Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`);
 
     // Create the inline keyboard
     const keyboard = Markup.inlineKeyboard([
