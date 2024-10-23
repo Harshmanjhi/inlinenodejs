@@ -1,3 +1,4 @@
+const express = require('express');
 const { Telegraf, Markup } = require('telegraf');
 const { createCanvas, loadImage } = require('canvas');
 const axios = require('axios');
@@ -6,6 +7,8 @@ const AsyncLock = require('async-lock');
 const { harem, haremCallback } = require('./modules/harem');
 const { inlineQuery } = require('./modules/inline');
 const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument } = require('./modules/top');
+const app = express();
+const port = 3000;  // Hardcoded port number
 
 require('dotenv').config();
 
@@ -514,6 +517,15 @@ bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 
 // Handle all messages
 bot.on('message', messageCounter);
+
+app.get('/', (req, res) => {
+    res.send('Bot is running');
+});
+
+// Start the Express server with the hardcoded port
+app.listen(port, () => {
+    console.log(`Web server running on port ${port}`);
+});
 
 // Start the bot
 async function main() {
