@@ -94,9 +94,15 @@ const start = async (ctx) => {
         // Step 5: Complete message
         await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "🌟");
 
-        url_button1 = InlineKeyboardButton("🎭 ADD ME TO YOUR GROUP 🎭", url="http://t.me/${BOT_USERNAME}?startgroup=new")
-        url_button2 = InlineKeyboardButton("💬 SUPPORT", url="https://t.me/${SUPPORT_CHAT}")
-        url_button3 = InlineKeyboardButton("📢 UPDATES", url="https://t.me/${UPDATE_CHAT}")
+    const url_button1 = Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${botUsername}?startgroup=new`);
+    const url_button2 = Markup.button.url("💬 SUPPORT", `https://t.me/${supportChat}`);
+    const url_button3 = Markup.button.url("📢 UPDATES", `https://t.me/${updateChat}`);
+
+    // Create the inline keyboard
+    const keyboard = Markup.inlineKeyboard([
+        [url_button1], // First row with one button
+        [url_button2, url_button3] // Second row with two buttons
+    ]);
 
         keyboard = [[url_button],
                 [url_button2, url_buttom3]]
@@ -122,7 +128,7 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 🏆 Compete, collect, and rise to the top!
 
 Let's make your group the ultimate gaming hub! 🚀`,
-            reply_markup: reply_markup // Make sure to use reply_markup
+            reply_markup: keyboard // Make sure to use reply_markup
         });
     } catch (error) {
         console.error(`Error in start command: ${error.message}`);
