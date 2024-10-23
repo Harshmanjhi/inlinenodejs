@@ -105,8 +105,7 @@ const start = async (ctx) => {
         ctx.chat.id,
         PHOTO_URL,
         {
-            caption: `
- `
+            caption: 
 🎮 ***Welcome to Epic Arena!***
 
 Hey Adventurer! 👋 Ready for a thrilling quest?
@@ -124,7 +123,7 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 🏆 Compete, collect, and rise to the top!
 
 Let's make your group the ultimate gaming hub! 🚀
-            `,
+            ,
             reply_markup: keyboard
         }
     );
