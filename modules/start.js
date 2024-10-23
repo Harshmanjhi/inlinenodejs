@@ -94,16 +94,15 @@ const start = async (ctx) => {
         // Step 5: Complete message
         await ctx.telegram.editMessageText(checkMsg.chat.id, checkMsg.message_id, null, "🌟");
 
-        // Final step: Send the main message
-        const keyboard = Markup.inlineKeyboard([
-            [Markup.button.url("🎭 ADD ME TO YOUR GROUP 🎭", `http://t.me/${BOT_USERNAME}?startgroup=new`)],
-            [
-                Markup.button.url("💬 SUPPORT", `https://t.me/${SUPPORT_CHAT}`),
-                Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`)
-            ],
-            [Markup.button.callback("✨ View Harem", `harem:${userId}`)] // Add this line for harem button
-        ]);
+        url_button1 = InlineKeyboardButton("🎭 ADD ME TO YOUR GROUP 🎭", url="http://t.me/${BOT_USERNAME}?startgroup=new")
+        url_button2 = InlineKeyboardButton("💬 SUPPORT", url="https://t.me/${SUPPORT_CHAT}")
+        url_button3 = InlineKeyboardButton("📢 UPDATES", url="https://t.me/${UPDATE_CHAT}")
 
+        keyboard = [[url_button],
+                [url_button2, url_buttom3]]
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+   
         // Send photo with caption and inline keyboard
         await ctx.telegram.sendPhoto(ctx.chat.id, PHOTO_URL, {
             caption: `🎮 ***Welcome to Epic Arena!***
@@ -123,7 +122,7 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 🏆 Compete, collect, and rise to the top!
 
 Let's make your group the ultimate gaming hub! 🚀`,
-            reply_markup: keyboard // Make sure to use reply_markup
+            reply_markup: reply_markup // Make sure to use reply_markup
         });
     } catch (error) {
         console.error(`Error in start command: ${error.message}`);
