@@ -6,6 +6,7 @@ const sharp = require('sharp');
 const AsyncLock = require('async-lock');
 const { harem, haremCallback } = require('./modules/harem');
 const { inlineQuery } = require('./modules/inline');
+const { start } = require('./modules/start');
 const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument } = require('./modules/top');
 const path = require('path'); 
 const app = express();
@@ -497,7 +498,7 @@ bot.use((ctx, next) => {
     return next();
 });
 
-// Command registrations
+// *
 bot.command('start', (ctx) => ctx.reply('Welcome! Use /help to see available commands.'));
 bot.command(['guess', 'protecc', 'collect', 'grab', 'hunt'], guessCommand);
 bot.command('fav', favCommand);
@@ -505,14 +506,17 @@ bot.command('now', nowCommand);
 bot.command(['harem', 'collection'], (ctx) => harem(ctx));
 bot.action(/^harem:/, haremCallback);
 
-// Register command handlers
+// top.js
 bot.command('ctop', ctop);
 bot.command('TopGroups', globalLeaderboard);
 bot.command('stats', stats);
 bot.command('list', sendUsersDocument);
 bot.command('groups', sendGroupsDocument);
 
-// Inline query handler
+// start.js
+bot.command('start', start);
+
+// Inline.js
 bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 
 // Handle all messages
