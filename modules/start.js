@@ -105,7 +105,7 @@ const start = async (ctx) => {
     ]);
 
         keyboard = [[url_button1],
-                [url_button2, url_buttom3]]
+                [url_button2, url_button3]]
         
         reply_markup = InlineKeyboardMarkup(keyboard)
    
