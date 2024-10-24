@@ -351,7 +351,7 @@ async function messageCounter(update, context) {
         messageCounts[chatId].mathGame += 1;
 
         // Randomly start math game if count reaches 75
-        if (messageCounts[chatId].wordGame >= 75) {
+        if (messageCounts[chatId].wordGame >= 5) {
             if (Math.random() < 0.5) {  // Randomly choose to start the math game
                 await startMathGame(update, context);
             }
@@ -359,7 +359,7 @@ async function messageCounter(update, context) {
         }
 
         // Send character image if count reaches 100
-        if (messageCounts[chatId].character >= 100) {
+        if (messageCounts[chatId].character >= 4) {
             await sendImage(update, context);
             messageCounts[chatId].character = 0;  // Reset character count
         }
@@ -553,6 +553,295 @@ async function updateGroupStatistics(userId, chatId, ctx) {
     }
 }
 
+function generate_equation(level = null) {
+    if (level === null) {
+        level = Math.floor(Math.random() * 4) + 1;
+    }
+
+    let num1, num2, operator;
+    if (level === 1) {
+        num1 = Math.floor(Math.random() * 20) + 1;
+        num2 = Math.floor(Math.random() * 20) + 1;
+        operator = ['+', '-', 'x'][Math.floor(Math.random() * 3)];
+    } else if (level === 2) {
+        num1 = Math.floor(Math.random() * 50) + 1;
+        num2 = Math.floor(Math.random() * 50) + 1;
+        operator = ['+', '-', 'x', '/'][Math.floor(Math.random() * 4)];
+    } else if (level === 3) {
+        num1 = Math.floor(Math.random() * 100) + 1;
+        num2 = Math.floor(Math.random() * 10) + 1;
+        operator = ['+', '-', 'x', '/', '^'][Math.floor(Math.random() * 5)];
+    } else if (level === 4) {
+        num1 = Math.floor(Math.random() * 150) + 50;
+        num2 = Math.floor(Math.random() * 20) + 1;
+        operator = ['+', '-', 'x', '/', '^'][Math.floor(Math.random() * 5)];
+    }
+
+    let answer;
+    if (operator === '+') {
+        answer = num1 + num2;
+    } else if (operator === '-') {
+        answer = num1 - num2;
+    } else if (operator === 'x') {
+        answer = num1 * num2;
+    } else if (operator === '/') {
+        num1 = Math.floor(Math.random() * 100) + 1;
+        const factors = Array.from({ length: num1 }, (_, i) => i + 1).filter(i => num1 % i === 0);
+        num2 = factors[Math.floor(Math.random() * factors.length)];
+        answer = Math.floor(num1 / num2);
+    } else if (operator === '^') {
+        answer = Math.pow(num1, num2);
+    }
+
+    const problem = `${num1} ${operator} ${num2}`;
+    return [problem, answer.toString(), level];
+}
+
+async function create_equation_image(equation, width = 1060, height = 596) {
+    const response = await axios.get('https://files.catbox.moe/rbz6no.jpg', { responseType: 'arraybuffer' });
+    const background = await loadImage(response.data);
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(background, 0, 0, width, height);
+
+    const fontSize = 80;
+    ctx.font = `${fontSize}px DejaVuSans-Bold`;
+    ctx.fillStyle = 'black';
+
+    const textWidth = ctx.measureText(equation).width;
+    const textHeight = fontSize;
+    const x = (width - textWidth) / 2;
+    const y = (height + textHeight) / 2;
+
+    ctx.fillText(equation, x, y);
+
+    const buffer = canvas.toBuffer('image/png');
+    return buffer;
+}
+
+async function start_math_game(ctx) {
+    const chat_id = ctx.chat.id;
+
+    const [problem, answer, level] = generate_equation();
+    const img = await create_equation_image(problem);
+
+    await ctx.telegram.sendPhoto(chat_id, { source: img }, { caption: 'Solve this math problem!' });
+
+    ctx.session.math_game_active = true;
+    ctx.session.math_answer = answer;
+}
+
+async function process_math_guess(ctx) {
+    const chat_id = ctx.chat.id;
+    const user_id = ctx.from.id;
+    const guess = ctx.message.text.trim();
+
+    if (!ctx.session.math_game_active) {
+        await ctx.reply('There is no active math game at the moment.');
+        return;
+    }
+
+    const correct_answer = ctx.session.math_answer;
+    if (correct_answer === null) {
+        await ctx.reply('Something went wrong! Please start a new game.');
+        return;
+    }
+
+    if (guess === correct_answer) {
+        ctx.session.math_game_active = false;
+        delete ctx.session.math_answer;
+
+        await react_to_message(chat_id, ctx.message.message_id);
+
+        let user = await ctx.db.destinationCollection.findOne({ id: user_id });
+        if (user) {
+            const current_balance = user.balance || 0;
+            const new_balance = current_balance + 40;
+            await ctx.db.destinationCollection.updateOne({ id: user_id }, { $set: { balance: new_balance } });
+            const balance_message = `Your new balance is ${new_balance} coins.`;
+        } else {
+            const new_balance = 40;
+            await ctx.db.destinationCollection.insertOne({ id: user_id, balance: new_balance });
+            const balance_message = 'You\'ve earned 40 coins!';
+        }
+
+        await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\n${balance_message}`);
+
+        await update_statistics(user_id, chat_id, ctx);
+    }
+}
+
+const words = [
+    "dog", "cat", "bird", "lion", "tiger", "elephant", "monkey", "zebra",
+    "apple", "banana", "grape", "honey", "juice",
+    "kite", "mountain", "ocean", "river", "sun", "tree",
+    "umbrella", "water", "car", "garden", "hat", "island",
+    "lemon", "orange", "road", "stone", "train",
+    "vase", "window", "yarn", "zoo", "ant", "eagle", "fox",
+    "goat", "hippo", "iguana", "jellyfish", "kangaroo",
+    "lemur", "meerkat", "newt", "penguin", "rabbit",
+    "seal", "turtle", "whale", "yak", "wolf", "panther",
+    "dolphin", "frog", "horse", "koala", "ostrich", "peacock",
+    "reindeer", "shark", "toucan", "viper", "walrus",
+    "zebra", "baboon", "cheetah", "deer", "elephant",
+    "flamingo", "gorilla", "hamster", "iguana", "jaguar",
+    "koala", "lemur", "mongoose", "narwhal", "owl",
+    "parrot", "quetzal", "raven", "sloth", "toucan",
+    "vulture", "zebra", "alligator", "buffalo", "dolphin",
+    "flamingo", "giraffe", "hummingbird", "iguana", "jackal",
+    "kangaroo", "lemur", "macaw", "narwhal", "parrot",
+    "quail", "reindeer", "sloth", "toucan", "wallaby",
+    "xenops", "yak", "zebra", "alligator", "baboon",
+    "camel", "donkey", "falcon", "hippo", "jackrabbit",
+    "koala", "mongoose", "owl", "raven", "seagull",
+    "tapir", "viper", "wombat", "xenops", "yak", "zebra",
+    "rain", "storm", "fog", "wind", "sunshine",
+    "rainbow", "hurricane", "snow", "dew", "frost",
+    "clear", "gust", "overcast", "sunny", "flood",
+    "swelter", "stormy", "calm", "cold", "hot", "cool",
+    "mild", "refreshing", "warm", "scorching", "boiling",
+    "foggy", "snowy", "windy", "rainy", "sunset", "dusk",
+    "afternoon", "morning", "midnight", "midday",
+    "starlight", "moonlight", "weekday", "weekend", "year",
+    "century", "millennium", "moment", "minute", "hour",
+    "day", "week", "year", "era", "epoch", "event",
+    "circumstance", "condition", "case", "instance",
+    "background", "location", "place", "spot", "city",
+    "town", "village", "street", "road", "path",
+    "trail", "intersection", "block", "house", "apartment",
+    "office", "store", "shop", "market", "mall",
+    "hotel", "restaurant", "bar", "club", "theater",
+    "museum", "stadium", "park", "school", "college",
+    "hospital", "pharmacy", "bank", "library", "church",
+    "temple", "mosque", "shrine", "palace", "castle",
+    "monument", "statue", "tower", "factory", "warehouse",
+    "farm", "ranch", "workshop", "studio"
+];
+
+function create_hidden_word(word) {
+    if (word.length <= 4) {
+        return `${word[0]} ${'_ '.repeat(word.length - 2)}${word[word.length - 1]}`;
+    } else if (word.length <= 6) {
+        const middle = Math.floor(word.length / 2);
+        return `${word[0]} ${'_ '.repeat(middle - 1)}${word[middle]} ${'_ '.repeat(word.length - middle - 2)}${word[word.length - 1]}`;
+    } else {
+        const third = Math.floor(word.length / 3);
+        const two_thirds = 2 * third;
+        return `${word[0]} ${'_ '.repeat(third - 1)}${word[third]} ${'_ '.repeat(third - 1)}${word[two_thirds]} ${'_ '.repeat(word.length - two_thirds - 2)}${word[word.length - 1]}`;
+    }
+}
+
+async function create_word_image(word, width = 1060, height = 596) {
+    const response = await axios.get('https://files.catbox.moe/rbz6no.jpg', { responseType: 'arraybuffer' });
+    const background = await loadImage(response.data);
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(background, 0, 0, width, height);
+
+    const fontSize = 80;
+    ctx.font = `${fontSize}px DejaVuSans-Bold`;
+    ctx.fillStyle = 'black';
+
+    const hidden_word = create_hidden_word(word);
+    const textWidth = ctx.measureText(hidden_word).width;
+    const textHeight = fontSize;
+    const x = (width - textWidth) / 2;
+    const y = (height + textHeight) / 2;
+
+    ctx.fillText(hidden_word, x, y);
+
+    const buffer = canvas.toBuffer('image/png');
+    return buffer;
+}
+
+async function start_word_game(ctx) {
+    const chat_id = ctx.chat.id;
+
+    const word = words[Math.floor(Math.random() * words.length)];
+    const img_bytes = await create_word_image(word);
+
+    await ctx.telegram.sendPhoto(chat_id, { source: img_bytes }, { caption: 'A new word has appeared! Can you guess what it is?' });
+
+    ctx.session.word_game_active = true;
+    ctx.session.word_to_guess = word;
+}
+
+async function process_word_guess(ctx) {
+    const chat_id = ctx.chat.id;
+    const user_id = ctx.from.id;
+    const guess = ctx.message.text.toLowerCase();
+
+    if (!ctx.session.word_to_guess) {
+        return;
+    }
+
+    const correct_word = ctx.session.word_to_guess;
+
+    if (guess === correct_word) {
+        delete ctx.session.word_to_guess;
+        ctx.session.word_game_active = false;
+
+        await react_to_message(chat_id, ctx.message.message_id);
+
+        let user = await ctx.db.destinationCollection.findOne({ id: user_id });
+        if (user) {
+            const current_balance = user.balance || 0;
+            const new_balance = current_balance + 40;
+            await ctx.db.destinationCollection.updateOne({ id: user_id }, { $set: { balance: new_balance } });
+
+            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You guessed the word correctly: ${correct_word}\nYou've earned 40 coins! Your new balance is ${new_balance} coins.`);
+        } else {
+            await ctx.db.destinationCollection.insertOne({ id: user_id, balance: 40 });
+
+            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You guessed the word correctly: ${correct_word}\nYou've earned 40 coins! Your new balance is 40 coins.`);
+        }
+
+        let group_user_total = await ctx.db.groupUserTotalsCollection.findOne({ user_id, group_id: chat_id });
+        if (group_user_total) {
+            const update_fields = {};
+            if (ctx.from.username && ctx.from.username !== group_user_total.username) {
+                update_fields.username = ctx.from.username;
+            }
+            if (ctx.from.first_name !== group_user_total.first_name) {
+                update_fields.first_name = ctx.from.first_name;
+            }
+            if (Object.keys(update_fields).length > 0) {
+                await ctx.db.groupUserTotalsCollection.updateOne({ user_id, group_id: chat_id }, { $set: update_fields });
+            }
+            await ctx.db.groupUserTotalsCollection.updateOne({ user_id, group_id: chat_id }, { $inc: { count: 1 } });
+        } else {
+            await ctx.db.groupUserTotalsCollection.insertOne({
+                user_id,
+                group_id: chat_id,
+                username: ctx.from.username,
+                first_name: ctx.from.first_name,
+                count: 1,
+            });
+        }
+
+        let group_info = await ctx.db.topGlobalGroupsCollection.findOne({ group_id: chat_id });
+        if (group_info) {
+            const update_fields = {};
+            if (ctx.chat.title !== group_info.group_name) {
+                update_fields.group_name = ctx.chat.title;
+            }
+            if (Object.keys(update_fields).length > 0) {
+                await ctx.db.topGlobalGroupsCollection.updateOne({ group_id: chat_id }, { $set: update_fields });
+            }
+            await ctx.db.topGlobalGroupsCollection.updateOne({ group_id: chat_id }, { $inc: { count: 1 } });
+        } else {
+            await ctx.db.topGlobalGroupsCollection.insertOne({
+                group_id: chat_id,
+                group_name: ctx.chat.title,
+                count: 1,
+            });
+        }
+    }
+}
 
 bot.use((ctx, next) => {
     ctx.db = {
