@@ -14,7 +14,6 @@ const app = express();
 const port = 3000;  // Hardcoded port number
 
 // At the top of your file, add this line:
-const chatData = new Map();
 
 require('dotenv').config();
 
@@ -315,7 +314,10 @@ async function nowCommand(ctx) {
     }
 }
 
+// At the top of your file, add this line:
+const chatData = new Map();
 
+// Replace the existing messageCounter function with this updated version:
 async function messageCounter(ctx) {
     const chatId = ctx.chat.id.toString();
     const userId = ctx.from.id;
@@ -323,60 +325,70 @@ async function messageCounter(ctx) {
         return;
     }
 
-    if (!(chatId in locks)) {
-        locks[chatId] = new AsyncLock();
+    // Initialize chat data if it doesn't exist
+    if (!chatData.has(chatId)) {
+        chatData.set(chatId, {
+            lock: new AsyncLock(),
+            lastUser: null,
+            warnedUsers: new Map(),
+            messageCounts: { wordGame: 0, character: 0, mathGame: 0 },
+            mathGameActive: false,
+            mathAnswer: null,
+            wordGameActive: false,
+            wordToGuess: null,
+            lastCharacter: null,
+            firstCorrectGuess: null
+        });
     }
-    const lock = locks[chatId];
 
-    await lock.acquire(chatId, async () => {
+    const chatDataObj = chatData.get(chatId);
+
+    await chatDataObj.lock.acquire(chatId, async () => {
         // Anti-spam logic
-        if (chatId in lastUser && lastUser[chatId].userId === userId) {
-            lastUser[chatId].count += 1;
-            if (lastUser[chatId].count >= 10) {
-                if (userId in warnedUsers && Date.now() - warnedUsers[userId] < 600000) {
+        if (chatDataObj.lastUser && chatDataObj.lastUser.userId === userId) {
+            chatDataObj.lastUser.count += 1;
+            if (chatDataObj.lastUser.count >= 10) {
+                if (chatDataObj.warnedUsers.has(userId) && Date.now() - chatDataObj.warnedUsers.get(userId) < 600000) {
                     return;
                 } else {
                     await ctx.reply(`⚠️ Don't Spam ${ctx.from.first_name}...\nYour Messages Will be ignored for 10 Minutes...`);
-                    warnedUsers[userId] = Date.now();
+                    chatDataObj.warnedUsers.set(userId, Date.now());
                     return;
                 }
             }
         } else {
-            lastUser[chatId] = { userId: userId, count: 1 };
+            chatDataObj.lastUser = { userId: userId, count: 1 };
         }
 
         // Message counting for different game types
-        if (!(chatId in messageCounts)) {
-            messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
-        }
-        messageCounts[chatId].wordGame += 1;
-        messageCounts[chatId].character += 1;
-        messageCounts[chatId].mathGame += 1;
+        chatDataObj.messageCounts.wordGame += 1;
+        chatDataObj.messageCounts.character += 1;
+        chatDataObj.messageCounts.mathGame += 1;
 
         // Trigger different games based on message counts
-        if (messageCounts[chatId].wordGame >= 5) {
+        if (chatDataObj.messageCounts.wordGame >= 5) {
             if (Math.random() < 0.5) {
                 await startMathGame(ctx);
             }
-            messageCounts[chatId].wordGame = 0;
+            chatDataObj.messageCounts.wordGame = 0;
         }
 
-        if (messageCounts[chatId].character >= 4) {
+        if (chatDataObj.messageCounts.character >= 4) {
             await sendImage(ctx);
-            messageCounts[chatId].character = 0;
+            chatDataObj.messageCounts.character = 0;
         }
 
         // Process ongoing games
-        if (ctx.chat_data.mathGameActive) {
+        if (chatDataObj.mathGameActive) {
             await processMathGuess(ctx);
         }
 
-        if (chatId in lastCharacters) {
-            await guess(ctx);
+        if (chatDataObj.lastCharacter) {
+            await processCharacterGuess(ctx);
         }
 
-        if (ctx.chat_data.wordGameActive) {
-            await startWordGame(ctx);
+        if (chatDataObj.wordGameActive) {
+            await processWordGuess(ctx);
         }
     });
 
@@ -620,7 +632,6 @@ async function create_equation_image(equation, width = 1060, height = 596) {
     return buffer;
 }
 
-// Update the startMathGame function:
 async function startMathGame(ctx) {
     const chatId = ctx.chat.id.toString();
     const chatDataObj = chatData.get(chatId);
@@ -632,7 +643,6 @@ async function startMathGame(ctx) {
 
     chatDataObj.mathGameActive = true;
     chatDataObj.mathAnswer = answer;
-}
 
 // Update the processMathGuess function:
 async function processMathGuess(ctx) {
@@ -673,6 +683,7 @@ async function processMathGuess(ctx) {
         await updateStatistics(userId, chatId, ctx);
     }
 }
+
 
 const words = [
     "dog", "cat", "bird", "lion", "tiger", "elephant", "monkey", "zebra",
