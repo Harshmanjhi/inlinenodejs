@@ -23,6 +23,7 @@ const MUST_JOIN = "DDW_PFP_02";
 
 // Emojis and words for games
 const emojis = ["👍", "😘", "❤️", "🔥", "🥰", "🤩", "💘", "💯", "✨", "⚡️", "🏆", "🤭", "🎉"];
+const words = ["dog", "cat", "bird", /* ... other words ... */];
 
 // Rarity weights for character selection
 const RARITY_WEIGHTS = {
@@ -35,7 +36,13 @@ const RARITY_WEIGHTS = {
 };
 
 // Global variables
-const chatData = new Map();
+const locks = {};
+const lastUser = {};
+const warnedUsers = {};
+const messageCounts = {};
+const sentCharacters = {};
+const lastCharacters = {};
+const firstCorrectGuesses = {};
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -80,38 +87,35 @@ async function reactToMessage(chatId, messageId) {
 }
 
 async function sendImage(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const allCharacters = await destinationCharCollection.find({}).toArray().catch(error => {
-        console.error("Error fetching characters:", error);
-        return [];
-    });
+    const chatId = ctx.chat.id;
+    const allCharacters = await destinationCharCollection.find({}).toArray();
 
-    if (!allCharacters || allCharacters.length === 0) {
-        await ctx.reply("No characters available to send.");
-        return;
+    // Initialize sentCharacters for the chat if not already done
+    if (!sentCharacters[chatId]) {
+        sentCharacters[chatId] = [];
     }
-
-    // Initialize chat data if it doesn't exist
-    if (!chatData.has(chatId)) {
-        chatData.set(chatId, {
-            sentCharacters: [],
-            lastCharacter: null,
-            availableCharacters: allCharacters.filter(c =>
-                c.id &&
-                c.rarity != null &&
-                c.rarity !== '💸 Premium Edition'
-            )
-        });
-    }
-
-    const chatDataObj = chatData.get(chatId);
 
     // Reset sentCharacters if all have been sent
-    if (chatDataObj.sentCharacters.length === allCharacters.length) {
-        chatDataObj.sentCharacters = [];
+    if (sentCharacters[chatId].length === allCharacters.length) {
+        sentCharacters[chatId] = [];
     }
 
-    if (chatDataObj.availableCharacters.length === 0) {
+    // Initialize availableCharacters in user data
+    if (!ctx.user_data) {
+        ctx.user_data = {};
+    }
+    if (!ctx.user_data.available_characters) {
+        ctx.user_data.available_characters = allCharacters.filter(c =>
+            c.id &&
+            !sentCharacters[chatId].includes(c.id) &&
+            c.rarity != null &&
+            c.rarity !== '💸 Premium Edition'
+        );
+    }
+
+    const availableCharacters = ctx.user_data.available_characters;
+
+    if (availableCharacters.length === 0) {
         await ctx.reply("No characters available to send.");
         return; // Exit if no characters are available
     }
@@ -119,7 +123,7 @@ async function sendImage(ctx) {
     // Calculate cumulative weights
     const cumulativeWeights = [];
     let cumulativeWeight = 0;
-    for (const character of chatDataObj.availableCharacters) {
+    for (const character of availableCharacters) {
         cumulativeWeight += RARITY_WEIGHTS[character.rarity] || 1;
         cumulativeWeights.push(cumulativeWeight);
     }
@@ -128,16 +132,16 @@ async function sendImage(ctx) {
     let selectedCharacter = null;
 
     // Select a character based on random weight
-    for (let i = 0; i < chatDataObj.availableCharacters.length; i++) {
+    for (let i = 0; i < availableCharacters.length; i++) {
         if (rand <= cumulativeWeights[i]) {
-            selectedCharacter = chatDataObj.availableCharacters[i];
+            selectedCharacter = availableCharacters[i];
             break;
         }
     }
 
     // Fallback if no character was selected
     if (!selectedCharacter) {
-        selectedCharacter = chatDataObj.availableCharacters[Math.floor(Math.random() * chatDataObj.availableCharacters.length)];
+        selectedCharacter = availableCharacters[Math.floor(Math.random() * availableCharacters.length)];
     }
 
     // Check if selectedCharacter is still undefined
@@ -147,8 +151,8 @@ async function sendImage(ctx) {
     }
 
     // Update sent characters and last character
-    chatDataObj.sentCharacters.push(selectedCharacter.id);
-    chatDataObj.lastCharacter = selectedCharacter;
+    sentCharacters[chatId].push(selectedCharacter.id);
+    lastCharacters[chatId] = selectedCharacter;
 
     // Generate a character code
     const characterCode = `#${Math.floor(Math.random() * 90000) + 10000}`;
@@ -163,21 +167,20 @@ async function sendImage(ctx) {
     });
 
     // Store the message ID for later use
-    chatDataObj.lastCharacter.message_id = sentMessage.message_id;
+    lastCharacters[chatId].message_id = sentMessage.message_id;
 }
 
+// Command handlers
 async function guessCommand(ctx) {
-    const chatId = ctx.chat.id.toString();
+    const chatId = ctx.chat.id;
     const userId = ctx.from.id;
 
-    if (!chatData.has(chatId) || !chatData.get(chatId).lastCharacter) {
+    if (!(chatId in lastCharacters)) {
         await ctx.reply('There is no active character to guess.');
         return;
     }
 
-    const chatDataObj = chatData.get(chatId);
-
-    if (chatDataObj.firstCorrectGuess) {
+    if (chatId in firstCorrectGuesses) {
         await ctx.reply('❌ Oops! Someone already guessed this character. Better luck next time, adventurer! 🍀');
         return;
     }
@@ -194,10 +197,10 @@ async function guessCommand(ctx) {
         return;
     }
 
-    const nameParts = chatDataObj.lastCharacter.name.toLowerCase().split(' ');
+    const nameParts = lastCharacters[chatId].name.toLowerCase().split(' ');
 
     if (JSON.stringify(nameParts.sort()) === JSON.stringify(guess.split(' ').sort()) || nameParts.includes(guess)) {
-        chatDataObj.firstCorrectGuess = userId;
+        firstCorrectGuesses[chatId] = userId;
 
         try {
             const user = await destinationCollection.findOne({ id: userId });
@@ -213,13 +216,13 @@ async function guessCommand(ctx) {
                     await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
                 }
 
-                await destinationCollection.updateOne({ id: userId }, { $push: { characters: chatDataObj.lastCharacter } });
+                await destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
             } else if (ctx.from.username) {
                 await destinationCollection.insertOne({
                     id: userId,
                     username: ctx.from.username,
                     first_name: ctx.from.first_name,
-                    characters: [chatDataObj.lastCharacter],
+                    characters: [lastCharacters[chatId]],
                 });
             }
 
@@ -240,9 +243,9 @@ async function guessCommand(ctx) {
 
             await ctx.reply(
                 `🌟 <b><a href="tg://user?id=${userId}">${ctx.from.first_name}</a></b>, you've captured a new character! 🎊\n\n` +
-                `📛 𝗡𝗔𝗠𝗘: <b>${chatDataObj.lastCharacter.name}</b> \n` +
-                `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${chatDataObj.lastCharacter.anime}</b> \n` +
-                `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${chatDataObj.lastCharacter.rarity}</b>\n\n` +
+                `📛 𝗡𝗔𝗠𝗘: <b>${lastCharacters[chatId].name}</b> \n` +
+                `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${lastCharacters[chatId].anime}</b> \n` +
+                `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${lastCharacters[chatId].rarity}</b>\n\n` +
                 'This magical being has been added to your harem. Use /harem to view your growing collection!',
                 { parse_mode: 'HTML', ...keyboard }
             );
@@ -310,87 +313,126 @@ async function nowCommand(ctx) {
     }
 }
 
+// Message handler
 async function messageCounter(ctx) {
     const chatId = ctx.chat.id.toString();
     const userId = ctx.from.id;
     if (!['group', 'supergroup'].includes(ctx.chat.type)) {
         return;
     }
-
-    // Initialize chat data if it doesn't exist
-    if (!chatData.has(chatId)) {
-        chatData.set(chatId, {
-            lock: new AsyncLock(),
-            lastUser: null,
-            warnedUsers: new Map(),
-            messageCounts: { wordGame: 0, character: 0, mathGame: 0 },
-            mathGameActive: false,
-            mathAnswer: null,
-            wordGameActive: false,
-            wordToGuess: null,
-            lastCharacter: null,
-            firstCorrectGuess: null
-        });
+    if (!(chatId in locks)) {
+        locks[chatId] = new AsyncLock();
     }
-
-    const chatDataObj = chatData.get(chatId);
-
-    await chatDataObj.lock.acquire(chatId, async () => {
-        // Anti-spam logic
-        if (chatDataObj.lastUser && chatDataObj.lastUser.userId === userId) {
-            chatDataObj.lastUser.count += 1;
-            if (chatDataObj.lastUser.count >= 10) {
-                if (chatDataObj.warnedUsers.has(userId) && Date.now() - chatDataObj.warnedUsers.get(userId) < 600000) {
+    const lock = locks[chatId];
+    await lock.acquire(chatId, async () => {
+        if (chatId in lastUser && lastUser[chatId].userId === userId) {
+            lastUser[chatId].count += 1;
+            if (lastUser[chatId].count >= 10) {
+                if (userId in warnedUsers && Date.now() - warnedUsers[userId] < 600000) {
                     return;
                 } else {
                     await ctx.reply(`⚠️ Don't Spam ${ctx.from.first_name}...\nYour Messages Will be ignored for 10 Minutes...`);
-                    chatDataObj.warnedUsers.set(userId, Date.now());
+                    warnedUsers[userId] = Date.now();
                     return;
                 }
             }
         } else {
-            chatDataObj.lastUser = { userId: userId, count: 1 };
+            lastUser[chatId] = { userId: userId, count: 1 };
         }
-
-        // Message counting for different game types
-        chatDataObj.messageCounts.wordGame += 1;
-        chatDataObj.messageCounts.character += 1;
-        chatDataObj.messageCounts.mathGame += 1;
-
-        // Trigger different games based on message counts
-        if (chatDataObj.messageCounts.wordGame >= 5) {
+        if (!(chatId in messageCounts)) {
+            messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
+        }
+        messageCounts[chatId].wordGame += 1;
+        messageCounts[chatId].character += 1;
+        messageCounts[chatId].mathGame += 1;
+        
+        // Randomly start math game if count reaches 75
+        if (messageCounts[chatId].wordGame >= 5000000) {
             if (Math.random() < 0.5) {
                 await startMathGame(ctx);
             }
-            chatDataObj.messageCounts.wordGame = 0;
+            messageCounts[chatId].wordGame = 0;
         }
-
-        if (chatDataObj.messageCounts.character >= 4) {
+        
+        // Send character image if count reaches 100
+        if (messageCounts[chatId].character >= 2) {
             await sendImage(ctx);
-            chatDataObj.messageCounts.character = 0;
+            messageCounts[chatId].character = 0;
         }
-
-        // Process ongoing games
-        if (chatDataObj.mathGameActive) {
+        
+        // Process math game guess if active
+        if (ctx.chat.mathGameActive) {
             await processMathGuess(ctx);
         }
-
-        if (chatDataObj.lastCharacter) {
-            await processCharacterGuess(ctx);
+        
+        // Process character guess if active
+        if (chatId in lastCharacters) {
+            const guess = ctx.message.text.toLowerCase();
+            const nameParts = lastCharacters[chatId].name.toLowerCase().split(' ');
+            if (JSON.stringify(nameParts.sort()) === JSON.stringify(guess.split(' ').sort()) || nameParts.includes(guess)) {
+                // Correct guess logic
+                firstCorrectGuesses[chatId] = userId;
+                const user = await destinationCollection.findOne({ id: userId });
+                if (user) {
+                    const updateFields = {};
+                    if (ctx.from.username && ctx.from.username !== user.username) {
+                        updateFields.username = ctx.from.username;
+                    }
+                    if (ctx.from.first_name !== user.first_name) {
+                        updateFields.first_name = ctx.from.first_name;
+                    }
+                    if (Object.keys(updateFields).length > 0) {
+                        await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
+                    }
+                    await destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
+                } else if (ctx.from.username) {
+                    await destinationCollection.insertOne({
+                        id: userId,
+                        username: ctx.from.username,
+                        first_name: ctx.from.first_name,
+                        characters: [lastCharacters[chatId]],
+                    });
+                }
+                await reactToMessage(chatId, ctx.message.message_id);
+                const userBalance = await destinationCollection.findOne({ id: userId });
+                let newBalance = 40;
+                if (userBalance) {
+                    newBalance = (userBalance.balance || 0) + 40;
+                    await destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
+                } else {
+                    await destinationCollection.insertOne({ id: userId, balance: newBalance });
+                }
+                const keyboard = Markup.inlineKeyboard([
+                    [Markup.button.switchToChat("See Harem", `collection.${userId}`)]
+                ]);
+                await ctx.reply(
+                    `🌟 <b><a href="tg://user?id=${userId}">${ctx.from.first_name}</a></b>, you've captured a new character! 🎊\n\n` +
+                    `📛 𝗡𝗔𝗠𝗘: <b>${lastCharacters[chatId].name}</b> \n` +
+                    `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${lastCharacters[chatId].anime}</b> \n` +
+                    `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${lastCharacters[chatId].rarity}</b>\n\n` +
+                    'This magical being has been added to your harem. Use /harem to view your growing collection!',
+                    { parse_mode: 'HTML', ...keyboard }
+                );
+            }
+            // No response for incorrect guesses without the command
         }
-
-        if (chatDataObj.wordGameActive) {
+        
+        // Process word game guess if active
+        if (ctx.chat.wordGameActive) {
             await processWordGuess(ctx);
         }
     });
-
-    // Update user and group statistics
+    
+    // Update user information
     await updateUserInfo(userId, ctx);
+    
+    // Update group statistics
     await updateGroupStatistics(userId, chatId, ctx);
 }
 
+// Helper functions for statistics updates
 async function updateUserInfo(userId, ctx) {
-    const user = await  destinationCollection.findOne({ id: userId });
+    const user = await destinationCollection.findOne({ id: userId });
     if (user) {
         const updateFields = {};
         if (ctx.from.username && ctx.from.username !== user.username) {
@@ -450,258 +492,6 @@ async function updateGroupStatistics(userId, chatId, ctx) {
     }
 }
 
-function generate_equation(level = null) {
-    if (level === null) {
-        level = Math.floor(Math.random() * 4) + 1;
-    }
-
-    let num1, num2, operator;
-    if (level === 1) {
-        num1 = Math.floor(Math.random() * 20) + 1;
-        num2 = Math.floor(Math.random() * 20) + 1;
-        operator = ['+', '-', 'x'][Math.floor(Math.random() * 3)];
-    } else if (level === 2) {
-        num1 = Math.floor(Math.random() * 50) + 1;
-        num2 = Math.floor(Math.random() * 50) + 1;
-        operator = ['+', '-', 'x', '/'][Math.floor(Math.random() * 4)];
-    } else if (level === 3) {
-        num1 = Math.floor(Math.random() * 100) + 1;
-        num2 = Math.floor(Math.random() * 10) + 1;
-        operator = ['+', '-', 'x', '/', '^'][Math.floor(Math.random() * 5)];
-    } else if (level === 4) {
-        num1 = Math.floor(Math.random() * 150) + 50;
-        num2 = Math.floor(Math.random() * 20) + 1;
-        operator = ['+', '-', 'x', '/', '^'][Math.floor(Math.random() * 5)];
-    }
-
-    let answer;
-    if (operator === '+') {
-        answer = num1 + num2;
-    } else if (operator === '-') {
-        answer = num1 - num2;
-    } else if (operator === 'x') {
-        answer = num1 * num2;
-    } else if (operator === '/') {
-        num1 = Math.floor(Math.random() * 100) + 1;
-        const factors = Array.from({ length: num1 }, (_, i) => i + 1).filter(i => num1 % i === 0);
-        num2 = factors[Math.floor(Math.random() * factors.length)];
-        answer = Math.floor(num1 / num2);
-    } else if (operator === '^') {
-        answer = Math.pow(num1, num2);
-    }
-
-    const problem = `${num1} ${operator} ${num2}`;
-    return [problem, answer.toString(), level];
-}
-
-async function create_equation_image(equation, width = 1060, height = 596) {
-    const response = await axios.get('https://files.catbox.moe/rbz6no.jpg', { responseType: 'arraybuffer' });
-    const background = await loadImage(response.data);
-
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(background, 0, 0, width, height);
-
-    const fontSize = 80;
-    ctx.font = `${fontSize}px DejaVuSans-Bold`;
-    ctx.fillStyle = 'black';
-
-    const textWidth = ctx.measureText(equation).width;
-    const textHeight = fontSize;
-    const x = (width - textWidth) / 2;
-    const y = (height + textHeight) / 2;
-
-    ctx.fillText(equation, x, y);
-
-    const buffer = canvas.toBuffer('image/png');
-    return buffer;
-}
-
-async function startMathGame(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const chatDataObj = chatData.get(chatId);
-    
-    const [problem, answer, level] = generate_equation();
-    const img = await create_equation_image(problem);
-
-    await ctx.telegram.sendPhoto(chatId, { source: img }, { caption: 'Solve this math problem!' });
-
-    chatDataObj.mathGameActive = true;
-    chatDataObj.mathAnswer = answer;
-}
-
-async function processMathGuess(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const chatDataObj = chatData.get(chatId);
-    const userId = ctx.from.id;
-    const guess = ctx.message.text.trim();
-
-    if (!chatDataObj.mathGameActive) {
-        await ctx.reply('There is no active math game at the moment.');
-        return;
-    }
-
-    const correctAnswer = chatDataObj.mathAnswer;
-    if (correctAnswer === null) {
-        await ctx.reply('Something went wrong! Please start a new game.');
-        return;
-    }
-
-    if (guess === correctAnswer) {
-        chatDataObj.mathGameActive = false;
-        chatDataObj.mathAnswer = null;
-
-        await reactToMessage(chatId, ctx.message.message_id);
-
-        let user = await ctx.db.destinationCollection.findOne({ id: userId });
-        if (user) {
-            const currentBalance = user.balance || 0;
-            const newBalance = currentBalance + 40;
-            await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
-            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\nYour new balance is ${newBalance} coins.`);
-        } else {
-            const newBalance = 40;
-            await ctx.db.destinationCollection.insertOne({ id: userId, balance: newBalance });
-            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\nYou've earned 40 coins!`);
-        }
-
-        await updateStatistics(userId, chatId, ctx);
-    }
-}
-
-const words = [
-    "dog", "cat", "bird", "lion", "tiger", "elephant", "monkey", "zebra",
-    "apple", "banana", "grape", "honey", "juice",
-    "kite", "mountain", "ocean", "river", "sun", "tree",
-    "umbrella", "water", "car", "garden", "hat", "island",
-    "lemon", "orange", "road", "stone", "train",
-    "vase", "window", "yarn", "zoo", "ant", "eagle", "fox",
-    "goat", "hippo", "iguana", "jellyfish", "kangaroo",
-    "lemur", "meerkat", "newt", "penguin", "rabbit",
-    "seal", "turtle", "whale", "yak", "wolf", "panther",
-    "dolphin", "frog", "horse", "koala", "ostrich", "peacock",
-    "reindeer", "shark", "toucan", "viper", "walrus",
-    "zebra", "baboon", "cheetah", "deer", "elephant",
-    "flamingo", "gorilla", "hamster", "iguana", "jaguar",
-    "koala", "lemur", "mongoose", "narwhal", "owl",
-    "parrot", "quetzal", "raven", "sloth", "toucan",
-    "vulture", "zebra", "alligator", "buffalo", "dolphin",
-    "flamingo", "giraffe", "hummingbird", "iguana", "jackal",
-    "kangaroo", "lemur", "macaw", "narwhal", "parrot",
-    "quail", "reindeer", "sloth", "toucan", "wallaby",
-    "xenops", "yak", "zebra", "alligator", "baboon",
-    "camel", "donkey", "falcon", "hippo", "jackrabbit",
-    "koala", "mongoose", "owl", "raven", "seagull",
-    "tapir", "viper", "wombat", "xenops", "yak", "zebra",
-    "rain", "storm", "fog", "wind", "sunshine",
-    "rainbow", "hurricane", "snow", "dew", "frost",
-    "clear", "gust", "overcast", "sunny", "flood",
-    "swelter", "stormy", "calm", "cold", "hot", "cool",
-    "mild", "refreshing", "warm", "scorching", "boiling",
-    "foggy", "snowy", "windy", "rainy", "sunset", "dusk",
-    "afternoon", "morning", "midnight", "midday",
-    "starlight", "moonlight", "weekday", "weekend", "year",
-    "century", "millennium", "moment", "minute", "hour",
-    "day", "week", "year", "era", "epoch", "event",
-    "circumstance", "condition", "case", "instance",
-    "background", "location", "place", "spot", "city",
-    "town", "village", "street", "road", "path",
-    "trail", "intersection", "block", "house", "apartment",
-    "office", "store", "shop", "market", "mall",
-    "hotel", "restaurant", "bar", "club", "theater",
-    "museum", "stadium", "park", "school", "college",
-    "hospital", "pharmacy", "bank", "library", "church",
-    "temple", "mosque", "shrine", "palace", "castle",
-    "monument", "statue", "tower", "factory", "warehouse",
-    "farm", "ranch", "workshop", "studio"
-];
-
-function create_hidden_word(word) {
-    if (word.length <= 4) {
-        return `${word[0]} ${'_ '.repeat(word.length - 2)}${word[word.length - 1]}`;
-    } else if (word.length <= 6) {
-        const middle = Math.floor(word.length / 2);
-        return `${word[0]} ${'_ '.repeat(middle - 1)}${word[middle]} ${'_ '.repeat(word.length - middle - 2)}${word[word.length - 1]}`;
-    } else {
-        const third = Math.floor(word.length / 3);
-        const two_thirds = 2 * third;
-        return `${word[0]} ${'_ '.repeat(third - 1)}${word[third]} ${'_ '.repeat(third - 1)}${word[two_thirds]} ${'_ '.repeat(word.length - two_thirds - 2)}${word[word.length - 1]}`;
-    }
-}
-
-async function create_word_image(word, width = 1060, height = 596) {
-    const response = await axios.get('https://files.catbox.moe/rbz6no.jpg', { responseType: 'arraybuffer' });
-    const background = await loadImage(response.data);
-
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
-
-    ctx.drawImage(background, 0, 0, width, height);
-
-    const fontSize = 80;
-    ctx.font = `${fontSize}px DejaVuSans-Bold`;
-    ctx.fillStyle = 'black';
-
-    const hidden_word = create_hidden_word(word);
-    const textWidth = ctx.measureText(hidden_word).width;
-    const textHeight = fontSize;
-    const x = (width - textWidth) / 2;
-    const y = (height + textHeight) / 2;
-
-    ctx.fillText(hidden_word, x, y);
-
-    const buffer = canvas.toBuffer('image/png');
-    return buffer;
-}
-
-async function startWordGame(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const chatDataObj = chatData.get(chatId);
-
-    const word = words[Math.floor(Math.random() * words.length)];
-    const img_bytes = await create_word_image(word);
-
-    await ctx.telegram.sendPhoto(chatId, { source: img_bytes }, { caption: 'A new word has appeared! Can you guess what it is?' });
-
-    chatDataObj.wordGameActive = true;
-    chatDataObj.wordToGuess = word;
-}
-
-async function processWordGuess(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const chatDataObj = chatData.get(chatId);
-    const userId = ctx.from.id;
-    const guess = ctx.message.text.toLowerCase();
-
-    if (!chatDataObj.wordToGuess) {
-        return;
-    }
-
-    const correctWord = chatDataObj.wordToGuess;
-
-    if (guess === correctWord) {
-        chatDataObj.wordGameActive = false;
-        chatDataObj.wordToGuess = null;
-
-        await reactToMessage(chatId, ctx.message.message_id);
-
-        let user = await ctx.db.destinationCollection.findOne({ id: userId });
-        if (user) {
-            const currentBalance = user.balance || 0;
-            const newBalance = currentBalance + 40;
-            await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
-
-            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You guessed the word correctly: ${correctWord}\nYou've earned 40 coins! Your new balance is ${newBalance} coins.`);
-        } else {
-            await ctx.db.destinationCollection.insertOne({ id: userId, balance: 40 });
-
-            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You guessed the word correctly: ${correctWord}\nYou've earned 40 coins! Your new balance is 40 coins.`);
-        }
-
-        await updateGroupStatistics(userId, chatId, ctx);
-    }
-}
 
 bot.use((ctx, next) => {
     ctx.db = {
@@ -710,50 +500,56 @@ bot.use((ctx, next) => {
         topGlobalGroupsCollection,
         pmUsersCollection,
         destinationCollection,
-        destinationCharCollection
+        destinationCharCollection,
+        collection: destinationCharCollection
     };
     return next();
 });
 
-bot.command('start', start);
-bot.command('bal', balance);
-bot.command('pay', pay);
-bot.command('mtop', mtop);
-bot.command('ctop', ctop);
-bot.command('gtop', globalLeaderboard);
-bot.command('stats', stats);
-bot.command('harem', harem);
+// *
+bot.command(['guess', 'protecc', 'collect', 'grab', 'hunt'], guessCommand);
 bot.command('fav', favCommand);
-bot.command('guess', guessCommand);
 bot.command('now', nowCommand);
-bot.command('daily', dailyReward);
+bot.command(['harem', 'collection'], (ctx) => harem(ctx));
+bot.action(/^harem:/, haremCallback);
+
+// top.js
+bot.command('ctop', ctop);
+bot.command('TopGroups', globalLeaderboard);
+bot.command('stats', stats);
+bot.command('list', sendUsersDocument);
+bot.command('groups', sendGroupsDocument);
 bot.command('top', handleTopCommand);
 
-bot.on('callback_query', haremCallback);
-bot.on('inline_query', inlineQuery);
+// bal.js
+bot.command(['balance', 'cloins', 'mybalance', 'mycoins'], balance);
+bot.command(['pay', 'coinpay', 'paycoin', 'coinspay', 'paycoins'], pay);
+bot.command(['mtop', 'topcoins', 'coinstop', 'cointop'], mtop);
+bot.command(['dailyreward', 'dailytoken', 'daily', 'bonus', 'reward'], dailyReward);
 
+// start.js
+bot.command('start', start);
+
+// Inline.js
+bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
+
+// Handle all messages
 bot.on('message', messageCounter);
 
-bot.catch((err, ctx) => {
-    console.error(`Error for ${ctx.updateType}`, err);
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html')); // Serve index.html from the same directory
 });
 
-async function startBot() {
+// Start the Express server with the hardcoded port
+app.listen(port, () => {
+    console.log(`Web server running on port ${port}`);
+});
+
+// Start the bot
+async function main() {
     await connectToDatabase();
-    await bot.launch();
-    console.log('Bot is running');
+    bot.launch();
+    console.log("Bot started");
 }
 
-startBot();
-
-app.get('/', (req, res) => {
-    res.send('Hello World!');
-});
-
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
-});
-
-// Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'));
-process.once('SIGTERM', () => bot.stop('SIGTERM'));
+main();
