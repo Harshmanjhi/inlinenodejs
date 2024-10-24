@@ -480,7 +480,7 @@ async function messageCounter(ctx) {
 
 // Helper functions for statistics updates
 async function updateUserInfo(userId, ctx) {
-    const user = await destinationCollection.findOne({ id: userId });
+    const user = await ctx.db.destinationCollection.findOne({ id: userId });
     if (user) {
         const updateFields = {};
         if (ctx.from.username && ctx.from.username !== user.username) {
@@ -490,13 +490,13 @@ async function updateUserInfo(userId, ctx) {
             updateFields.first_name = ctx.from.first_name;
         }
         if (Object.keys(updateFields).length > 0) {
-            await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
+            await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: updateFields });
         }
     }
 }
 
 async function updateGroupStatistics(userId, chatId, ctx) {
-    const groupUserTotal = await groupUserTotalsCollection.findOne({ user_id: userId, group_id: chatId });
+    const groupUserTotal = await ctx.db.groupUserTotalsCollection.findOne({ user_id: userId, group_id: chatId });
     if (groupUserTotal) {
         const updateFields = {};
         if (ctx.from.username && ctx.from.username !== groupUserTotal.username) {
@@ -506,12 +506,12 @@ async function updateGroupStatistics(userId, chatId, ctx) {
             updateFields.first_name = ctx.from.first_name;
         }
         if (Object.keys(updateFields).length > 0) {
-            await groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $set: updateFields });
+            await ctx.db.groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $set: updateFields });
         }
         
-        await groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $inc: { count: 1 } });
+        await ctx.db.groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $inc: { count: 1 } });
     } else {
-        await groupUserTotalsCollection.insertOne({
+        await ctx.db.groupUserTotalsCollection.insertOne({
             user_id: userId,
             group_id: chatId,
             username: ctx.from.username,
@@ -520,19 +520,19 @@ async function updateGroupStatistics(userId, chatId, ctx) {
         });
     }
 
-    const groupInfo = await topGlobalGroupsCollection.findOne({ group_id: chatId });
+    const groupInfo = await ctx.db.topGlobalGroupsCollection.findOne({ group_id: chatId });
     if (groupInfo) {
         const updateFields = {};
         if (ctx.chat.title !== groupInfo.group_name) {
             updateFields.group_name = ctx.chat.title;
         }
         if (Object.keys(updateFields).length > 0) {
-            await topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $set: updateFields });
+            await ctx.db.topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $set: updateFields });
         }
         
-        await topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $inc: { count: 1 } });
+        await ctx.db.topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $inc: { count: 1 } });
     } else {
-        await topGlobalGroupsCollection.insertOne({
+        await ctx.db.topGlobalGroupsCollection.insertOne({
             group_id: chatId,
             group_name: ctx.chat.title,
             count: 1,
@@ -894,9 +894,7 @@ bot.command('start', start);
 bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 
 // Handle all messages
-bot.on('message', async (ctx) => {
-  await messageCounter(ctx);
-});
+bot.on('message', messageCounter);
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html')); // Serve index.html from the same directory
