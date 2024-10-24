@@ -535,8 +535,10 @@ bot.command('start', start);
 bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 
 // Handle all messages
-bot.on('message', messageCounter);
-bot.on('message', messageCounter2);
+bot.on('message', async (ctx) => {
+  await messageCounter(ctx);
+  await messageCounter2(ctx);
+});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html')); // Serve index.html from the same directory
