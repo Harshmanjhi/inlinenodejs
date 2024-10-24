@@ -592,7 +592,7 @@ app.listen(port, () => {
 
 
 importModules().then(() => {
-  await connectToDatabase();
+  connectToDatabase();
   bot.launch();
   console.log('Bot is running!');
 }).catch(error => {
