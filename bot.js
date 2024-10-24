@@ -81,9 +81,12 @@ const firstCorrectGuesses = {};
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     try {
-        await bot.telegram.setMessageReaction(chatId, messageId, [{ type: "emoji", emoji: randomEmoji }]);
-    } catch (error)
+        await bot.telegram.sendMessage(chatId, randomEmoji, { reply_to_message_id: messageId });
+    } catch (error) {
+        // Error silently handled, no action taken
+    }
 }
+
 
 
 async function sendImage(ctx) {
