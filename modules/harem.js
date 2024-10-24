@@ -13,14 +13,14 @@ const RARITY_EMOJIS = {
 };
 
 async function harem(ctx, page = 0) {
-    console.log("Harem function called with page:", page);  // Log when the function is called
+    // console.log("Harem function called with page:", page);  // Log when the function is called
 
     const user_id = ctx.from.id;
     const CHARS_PER_PAGE = 10;
 
     try {
         const user = await ctx.db.destinationCollection.findOne({ id: user_id }, { characters: 1, favorites: 1 });
-        console.log("User found in DB:", user);  // Log user data
+        // console.log("User found in DB:", user);  // Log user data
 
         if (!user || !user.characters || user.characters.length === 0) {
             const message = "🌟 Your magical harem is empty! Start your adventure by guessing characters! 🎭";
@@ -70,13 +70,13 @@ async function harem(ctx, page = 0) {
 
         const keyboard = [];
 
-        console.log("Total Pages:", total_pages, "Current Page:", page); // Log the total and current page
+        // console.log("Total Pages:", total_pages, "Current Page:", page); // Log the total and current page
 
         keyboard.push([Markup.button.switchToCurrentChat(`🎭 See Full Collection (${total_count})`, `collection.${user_id}`)]);
 
 
         const reply_markup = Markup.inlineKeyboard(keyboard);
-        console.log("Generated keyboard:", keyboard);  // Log the generated keyboard
+        // console.log("Generated keyboard:", keyboard);  // Log the generated keyboard
 
         let photo, caption;
         if (user.favorites && user.favorites.length > 0) {
@@ -115,7 +115,7 @@ async function harem(ctx, page = 0) {
         }
 
     } catch (e) {
-        console.error(`Error in harem function: ${e}`);
+        // console.error(`Error in harem function: ${e}`);
         await ctx.reply("🚨 Something went wrong while fetching your harem! Please try again later.");
     }
 }
@@ -123,13 +123,13 @@ async function harem(ctx, page = 0) {
 async function haremCallback(ctx) {
     // Ensure that the match data exists
     if (!ctx.match || !ctx.match[0]) {
-        console.error("Callback data is missing or incorrect:", ctx.match);
+        // console.error("Callback data is missing or incorrect:", ctx.match);
         await ctx.reply("🚨 Invalid callback data received. Please try again.");
         return;
     }
 
     // Log the callback data for debugging
-    console.log("haremCallback triggered with data:", ctx.match[0]);
+    // console.log("haremCallback triggered with data:", ctx.match[0]);
 
     // Split the correct callback data (ctx.match[0])
     const [_, page, user_id] = ctx.match[0].split(':'); // Use ctx.match[0] instead of ctx.match[1]
