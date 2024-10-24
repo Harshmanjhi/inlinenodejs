@@ -78,17 +78,14 @@ const firstCorrectGuesses = {};
       }
   }
 
-// Helper functions
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     try {
-        await bot.telegram.sendMessage(chatId, randomEmoji, { reply_to_message_id: messageId });
+        await bot.telegram.setMessageReaction(chatId, messageId, [{ type: "emoji", emoji: randomEmoji }]);
     } catch (error) {
-        // Error silently handled, no action taken
+        console.error("Error setting reaction:", error);
     }
 }
-
-
 
 async function sendImage(ctx) {
     const chatId = ctx.chat.id;
