@@ -55,7 +55,7 @@ const firstCorrectGuesses = {};
   const DB_NAME = 'gaming_create';
 
   let client = null;
-  let db = null;
+  let userTotalsCollection, groupUserTotalsCollection, topGlobalGroupsCollection, pmUsersCollection, destinationCollection, destinationCharCollection;
 
 async function connectToMongoDB() {
   if (client && client.isConnected()) {
@@ -112,7 +112,6 @@ async function getCollections() {
     destinationCharCollection: db.collection('gaming_anime_characters')
   };
 }
-
 
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
