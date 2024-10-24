@@ -10,7 +10,8 @@ const { start } = require('./modules/start');
 const { messageCounter2 } = require('./modules/game');
 const { balance, pay, mtop, dailyReward } = require('./modules/bal'); 
 const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument, handleTopCommand } = require('./modules/top');
-const path = require('path'); 
+const fs = require('fs');
+const path = require('path');
 const app = express();
 const port = 3000;  // Hardcoded port number
 
