@@ -5,40 +5,43 @@ const messageCounts = {};
 const lastCharacters = {};
 const firstCorrectGuesses = {};
 
-async function messageCounter2(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const userId = ctx.from.id;
+export default function Component() {
+  async function messageCounter2(ctx) {
+    const chatId = ctx.chat.id.toString()
+    const userId = ctx.from.id
+    
     if (!['group', 'supergroup'].includes(ctx.chat.type)) {
-        return;
+      return
     }
+    
     if (!(chatId in locks)) {
-        locks[chatId] = new AsyncLock();
+      locks[chatId] = new AsyncLock()
     }
-        }
-        if (!(chatId in messageCounts)) {
-            messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
-        }
-        messageCounts[chatId].wordGame += 1;
+    
+    if (!(chatId in messageCounts)) {
+      messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 }
+    }
+    messageCounts[chatId].wordGame += 1
 
-        // Randomly start math game if count reaches 75
-        if (messageCounts[chatId].wordGame >= 5) {
-            if (Math.random() < 0.5) {
-                await startMathGame(ctx);
-            }
-            messageCounts[chatId].wordGame = 0;
-        }
+    // Randomly start math game if count reaches 75
+    if (messageCounts[chatId].wordGame >= 5) {
+      if (Math.random() < 0.5) {
+        await startMathGame(ctx)
+      }
+      messageCounts[chatId].wordGame = 0
+    }
 
-        // Process math game guess if active
-        if (ctx.chat.mathGameActive) {
-            await processMathGuess(ctx);
-        }
+    // Process math game guess if active
+    if (ctx.chat.mathGameActive) {
+      await processMathGuess(ctx)
+    }
 
-        // Process word game guess if active
-        if (ctx.chat.wordGameActive) {
-            await processWordGuess(ctx);
-        }
-    });
-}
+    // Process word game guess if active
+    if (ctx.chat.wordGameActive) {
+      await processWordGuess(ctx)
+    }
+  }
+
 
 const OPERATIONS = ['+', '-', 'x', '/', '^'];
 
