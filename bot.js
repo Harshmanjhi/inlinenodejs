@@ -35,7 +35,6 @@ const RARITY_WEIGHTS = {
     "🔮 Limited Edition": 0.1
 };
 
-
 // Global variables
 const locks = {};
 const lastUser = {};
@@ -44,39 +43,39 @@ const messageCounts = {};
 const sentCharacters = {};
 const lastCharacters = {};
 const firstCorrectGuesses = {};
-  
-  const bot = new Telegraf(process.env.BOT_TOKEN);
-  
-  const { MongoClient } = require('mongodb');
-  require('dotenv').config();
-  
-  const MONGODB_URI = process.env.MONGODB_URI;
-  const client = new MongoClient(MONGODB_URI);
-  
-  let db, userTotalsCollection, groupUserTotalsCollection, topGlobalGroupsCollection, pmUsersCollection, destinationCollection, destinationCharCollection;
-  
-  async function connectToDatabase() {
-      try {
-          await client.connect();
-          console.log('Connected to MongoDB');
-  
-          // Set the database
-          db = client.db('gaming_create'); // Use 'gaming_create' as the database name
-  
-          // Initialize collections
-          userTotalsCollection = db.collection('gaming_totals');
-          groupUserTotalsCollection = db.collection('gaming_group_total');
-          topGlobalGroupsCollection = db.collection('gaming_global_groups');
-          pmUsersCollection = db.collection('gaming_pm_users');
-          destinationCollection = db.collection('gamimg_user_collection');
-          destinationCharCollection = db.collection('gaming_anime_characters');
-  
-          console.log('All collections initialized');
-      } catch (error) {
-          console.error('MongoDB connection error:', error);
-          process.exit(1);
-      }
-  }
+
+const bot = new Telegraf(process.env.BOT_TOKEN);
+
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
+
+const MONGODB_URI = process.env.MONGODB_URI;
+const client = new MongoClient(MONGODB_URI);
+
+let db, userTotalsCollection, groupUserTotalsCollection, topGlobalGroupsCollection, pmUsersCollection, destinationCollection, destinationCharCollection;
+
+async function connectToDatabase() {
+    try {
+        await client.connect();
+        console.log('Connected to MongoDB');
+
+        // Set the database
+        db = client.db('gaming_create'); // Use 'gaming_create' as the database name
+
+        // Initialize collections
+        userTotalsCollection = db.collection('gaming_totals');
+        groupUserTotalsCollection = db.collection('gaming_group_total');
+        topGlobalGroupsCollection = db.collection('gaming_global_groups');
+        pmUsersCollection = db.collection('gaming_pm_users');
+        destinationCollection = db.collection('gamimg_user_collection');
+        destinationCharCollection = db.collection('gaming_anime_characters');
+
+        console.log('All collections initialized');
+    } catch (error) {
+        console.error('MongoDB connection error:', error);
+        process.exit(1);
+    }
+}
 
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
