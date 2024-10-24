@@ -1,5 +1,5 @@
-import AsyncLock from 'async-lock'
-  
+const AsyncLock = require('async-lock');
+
 const locks = {};
 const lastUser = {};
 const warnedUsers = {};
