@@ -622,8 +622,10 @@ async function startMathGame(ctx) {
         { caption: "Solve this math problem!" }
     );
 
+    // Set math game state
     ctx.chat.mathGameActive = true;
     ctx.chat.mathAnswer = answer;
+    console.log(`Math problem started: ${problem} = ${answer}`); // Debug info
 }
 
 async function processMathGuess(ctx) {
@@ -631,23 +633,27 @@ async function processMathGuess(ctx) {
     const userId = ctx.from.id;
     const guess = ctx.message.text.trim();
 
+    // Check if the game is active
     if (!ctx.chat.mathGameActive) {
         await ctx.reply('There is no active math game at the moment.');
         return;
     }
 
+    // Ensure there is an answer to compare with
     const correctAnswer = ctx.chat.mathAnswer;
-    if (correctAnswer === null) {
+    if (!correctAnswer) {
         await ctx.reply('Something went wrong! Please start a new game.');
         return;
     }
 
+    // Check if the user's guess is correct
     if (guess === correctAnswer) {
-        ctx.chat.mathGameActive = false;
+        ctx.chat.mathGameActive = false;  // Deactivate the game after correct guess
         delete ctx.chat.mathAnswer;
 
         await reactToMessage(chatId, ctx.message.message_id);
 
+        // Fetch or create user balance
         let user = await ctx.db.destinationCollection.findOne({ id: userId });
         if (user) {
             const currentBalance = user.balance || 0;
@@ -655,11 +661,13 @@ async function processMathGuess(ctx) {
             await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
             const balanceMessage = `Your new balance is ${newBalance} coins.`;
 
+            // Send success message with balance update
             await ctx.reply(
                 `🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\n` +
                 `You've earned 40 coins! ${balanceMessage}`
             );
         } else {
+            // Create a new user with balance
             const newBalance = 40;
             await ctx.db.destinationCollection.insertOne({ id: userId, balance: newBalance });
 
@@ -668,8 +676,12 @@ async function processMathGuess(ctx) {
                 "You've earned 40 coins! Your new balance is 40 coins."
             );
         }
+    } else {
+        // If the guess is incorrect
+        await ctx.reply(`❌ Incorrect! Try again.`);
     }
 }
+
 
 const words = [
     "dog", "cat", "bird", "lion", "tiger", "elephant", "monkey", "zebra",
