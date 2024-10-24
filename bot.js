@@ -492,6 +492,8 @@ async function updateUserInfo(userId, ctx) {
         if (Object.keys(updateFields).length > 0) {
             await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: updateFields });
         }
+    } else {
+        console.error('Collection or user not found!');
     }
 }
 
@@ -587,8 +589,8 @@ function generateEquation(level = null) {
 }
 
 async function createEquationImage(equation, width = 1060, height = 596) {
-    const response = await fetch("https://files.catbox.moe/rbz6no.jpg");
-    const buffer = await response.buffer();
+    const response = await axios.get("https://files.catbox.moe/rbz6no.jpg", { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response.data);
     const background = await loadImage(buffer);
 
     const canvas = createCanvas(width, height);
@@ -605,9 +607,9 @@ async function createEquationImage(equation, width = 1060, height = 596) {
 
     ctx.fillText(equation, positionX, positionY);
 
-    const imgBuffer = canvas.toBuffer('image/png');
-    return imgBuffer;
+    return canvas.toBuffer('image/png');
 }
+
 
 async function startMathGame(ctx) {
     const chatId = ctx.chat.id;
