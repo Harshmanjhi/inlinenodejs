@@ -13,6 +13,9 @@ const path = require('path');
 const app = express();
 const port = 3000;  // Hardcoded port number
 
+// At the top of your file, add this line:
+const chatData = new Map();
+
 require('dotenv').config();
 
 // Use these variables in your code
@@ -617,55 +620,57 @@ async function create_equation_image(equation, width = 1060, height = 596) {
     return buffer;
 }
 
-async function start_math_game(ctx) {
-    const chat_id = ctx.chat.id;
-
+// Update the startMathGame function:
+async function startMathGame(ctx) {
+    const chatId = ctx.chat.id.toString();
+    const chatDataObj = chatData.get(chatId);
+    
     const [problem, answer, level] = generate_equation();
     const img = await create_equation_image(problem);
 
-    await ctx.telegram.sendPhoto(chat_id, { source: img }, { caption: 'Solve this math problem!' });
+    await ctx.telegram.sendPhoto(chatId, { source: img }, { caption: 'Solve this math problem!' });
 
-    ctx.session.math_game_active = true;
-    ctx.session.math_answer = answer;
+    chatDataObj.mathGameActive = true;
+    chatDataObj.mathAnswer = answer;
 }
 
-async function process_math_guess(ctx) {
-    const chat_id = ctx.chat.id;
-    const user_id = ctx.from.id;
+// Update the processMathGuess function:
+async function processMathGuess(ctx) {
+    const chatId = ctx.chat.id.toString();
+    const chatDataObj = chatData.get(chatId);
+    const userId = ctx.from.id;
     const guess = ctx.message.text.trim();
 
-    if (!ctx.session.math_game_active) {
+    if (!chatDataObj.mathGameActive) {
         await ctx.reply('There is no active math game at the moment.');
         return;
     }
 
-    const correct_answer = ctx.session.math_answer;
-    if (correct_answer === null) {
+    const correctAnswer = chatDataObj.mathAnswer;
+    if (correctAnswer === null) {
         await ctx.reply('Something went wrong! Please start a new game.');
         return;
     }
 
-    if (guess === correct_answer) {
-        ctx.session.math_game_active = false;
-        delete ctx.session.math_answer;
+    if (guess === correctAnswer) {
+        chatDataObj.mathGameActive = false;
+        chatDataObj.mathAnswer = null;
 
-        await react_to_message(chat_id, ctx.message.message_id);
+        await reactToMessage(chatId, ctx.message.message_id);
 
-        let user = await ctx.db.destinationCollection.findOne({ id: user_id });
+        let user = await ctx.db.destinationCollection.findOne({ id: userId });
         if (user) {
-            const current_balance = user.balance || 0;
-            const new_balance = current_balance + 40;
-            await ctx.db.destinationCollection.updateOne({ id: user_id }, { $set: { balance: new_balance } });
-            const balance_message = `Your new balance is ${new_balance} coins.`;
+            const currentBalance = user.balance || 0;
+            const newBalance = currentBalance + 40;
+            await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
+            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\nYour new balance is ${newBalance} coins.`);
         } else {
-            const new_balance = 40;
-            await ctx.db.destinationCollection.insertOne({ id: user_id, balance: new_balance });
-            const balance_message = 'You\'ve earned 40 coins!';
+            const newBalance = 40;
+            await ctx.db.destinationCollection.insertOne({ id: userId, balance: newBalance });
+            await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\nYou've earned 40 coins!`);
         }
 
-        await ctx.reply(`🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\n${balance_message}`);
-
-        await update_statistics(user_id, chat_id, ctx);
+        await updateStatistics(userId, chatId, ctx);
     }
 }
 
