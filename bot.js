@@ -7,6 +7,7 @@ const AsyncLock = require('async-lock');
 const { harem, haremCallback } = require('./modules/harem');
 const { inlineQuery } = require('./modules/inline');
 const { start } = require('./modules/start');
+const { balance, pay, mtop, dailyReward } = require('/moudules/bal'); 
 const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument } = require('./modules/top');
 const path = require('path'); 
 const app = express();
@@ -524,6 +525,12 @@ bot.command('TopGroups', globalLeaderboard);
 bot.command('stats', stats);
 bot.command('list', sendUsersDocument);
 bot.command('groups', sendGroupsDocument);
+
+// bal.js
+bot.command(['balance', 'cloins', 'mybalance', 'mycoins'], balance);
+bot.command(['pay', 'coinpay', 'paycoin', 'coinspay', 'paycoins'], pay);
+bot.command(['mtop', 'topcoins', 'coinstop', 'cointop'], mtop);
+bot.command(['dailyreward', 'dailytoken', 'daily', 'bonus', 'reward'], dailyReward);
 
 // start.js
 bot.command('start', start);
