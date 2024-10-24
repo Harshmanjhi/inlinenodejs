@@ -1,4 +1,7 @@
 const AsyncLock = require('async-lock');
+const { createCanvas, loadImage } = require('canvas');
+const fetch = require('node-fetch');
+const { reactToMessage } = require('./bot');
 
 const locks = {};
 const lastUser = {};
@@ -8,39 +11,39 @@ const lastCharacters = {};
 const firstCorrectGuesses = {};
 
 async function messageCounter2(ctx) {
-  const chatId = ctx.chat.id.toString()
-  const userId = ctx.from.id
-  
-  if (!['group', 'supergroup'].includes(ctx.chat.type)) {
-    return
-  }
-  
-  if (!(chatId in locks)) {
-    locks[chatId] = new AsyncLock()
-  }
-  
-  if (!(chatId in messageCounts)) {
-    messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 }
-  }
-  messageCounts[chatId].wordGame += 1
-
-  // Randomly start math game if count reaches 75
-  if (messageCounts[chatId].wordGame >= 5) {
-    if (Math.random() < 0.5) {
-      await startMathGame(ctx)
+    const chatId = ctx.chat.id.toString();
+    const userId = ctx.from.id;
+    
+    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
+        return;
     }
-    messageCounts[chatId].wordGame = 0
-  }
+    
+    if (!(chatId in locks)) {
+        locks[chatId] = new AsyncLock();
+    }
+    
+    if (!(chatId in messageCounts)) {
+        messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
+    }
+    messageCounts[chatId].wordGame += 1;
 
-  // Process math game guess if active
-  if (ctx.chat.mathGameActive) {
-    await processMathGuess(ctx)
-  }
+    // Randomly start math game if count reaches 75
+    if (messageCounts[chatId].wordGame >= 5) {
+        if (Math.random() < 0.5) {
+            await startMathGame(ctx);
+        }
+        messageCounts[chatId].wordGame = 0;
+    }
 
-  // Process word game guess if active
-  if (ctx.chat.wordGameActive) {
-    await processWordGuess(ctx)
-  }
+    // Process math game guess if active
+    if (ctx.chat.mathGameActive) {
+        await processMathGuess(ctx);
+    }
+
+    // Process word game guess if active
+    if (ctx.chat.wordGameActive) {
+        await processWordGuess(ctx);
+    }
 }
 
 const OPERATIONS = ['+', '-', 'x', '/', '^'];
@@ -111,43 +114,42 @@ async function createEquationImage(equation, width = 1060, height = 596) {
     return imgBuffer;
 }
 
-async function startMathGame(update, context) {
-    const chatId = update.effective_chat.id;
+async function startMathGame(ctx) {
+    const chatId = ctx.chat.id;
 
     const [problem, answer, level] = generateEquation();
     const img = await createEquationImage(problem);
 
-    await context.bot.sendPhoto(
-        chatId,
+    await ctx.replyWithPhoto(
         { source: img },
         { caption: "Solve this math problem!" }
     );
 
-    context.chat_data.math_game_active = true;
-    context.chat_data.math_answer = answer;
+    ctx.chat.mathGameActive = true;
+    ctx.chat.mathAnswer = answer;
 }
 
-async function processMathGuess(update, context) {
-    const chatId = update.effective_chat.id;
-    const userId = update.effective_user.id;
-    const guess = update.message.text.trim();
+async function processMathGuess(ctx) {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const guess = ctx.message.text.trim();
 
-    if (!context.chat_data.math_game_active) {
-        await update.message.reply_text('There is no active math game at the moment.');
+    if (!ctx.chat.mathGameActive) {
+        await ctx.reply('There is no active math game at the moment.');
         return;
     }
 
-    const correctAnswer = context.chat_data.math_answer;
+    const correctAnswer = ctx.chat.mathAnswer;
     if (correctAnswer === null) {
-        await update.message.reply_text('Something went wrong! Please start a new game.');
+        await ctx.reply('Something went wrong! Please start a new game.');
         return;
     }
 
     if (guess === correctAnswer) {
-        context.chat_data.math_game_active = false;
-        delete context.chat_data.math_answer;
+        ctx.chat.mathGameActive = false;
+        delete ctx.chat.mathAnswer;
 
-        await reactToMessage(chatId, update.message.message_id);
+        await reactToMessage(chatId, ctx.message.message_id);
 
         let user = await ctx.db.destinationCollection.findOne({ id: userId });
         if (user) {
@@ -155,18 +157,21 @@ async function processMathGuess(update, context) {
             const newBalance = currentBalance + 40;
             await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
             const balanceMessage = `Your new balance is ${newBalance} coins.`;
+
+            await ctx.reply(
+                `🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\n` +
+                `You've earned 40 coins! ${balanceMessage}`
+            );
         } else {
             const newBalance = 40;
             await ctx.db.destinationCollection.insertOne({ id: userId, balance: newBalance });
-            const balanceMessage = "You've earned 40 coins!";
-        }
 
-        await update.message.reply_text(
-            `🎉 Congratulations ${update.effective_user.first_name}! You solved the math problem correctly!\n` +
-            `You've earned 40 coins! ${balanceMessage}`
-        );
+            await ctx.reply(
+                `🎉 Congratulations ${ctx.from.first_name}! You solved the math problem correctly!\n` +
+                "You've earned 40 coins! Your new balance is 40 coins."
+            );
+        }
     }
-    // The else block for incorrect answers has been removed
 }
 
 const words = [
@@ -252,38 +257,37 @@ async function createWordImage(word, width = 1060, height = 596) {
     return imgBuffer;
 }
 
-async function startWordGame(update, context) {
-    const chatId = update.effective_chat.id;
+async function startWordGame(ctx) {
+    const chatId = ctx.chat.id;
 
     const word = words[Math.floor(Math.random() * words.length)];
     const imgBytes = await createWordImage(word);
 
-    await context.bot.sendPhoto(
-        chatId,
+    await ctx.replyWithPhoto(
         { source: imgBytes },
         { caption: "A new word has appeared! Can you guess what it is?" }
     );
 
-    context.chat_data.word_game_active = true;
-    context.chat_data.word_to_guess = word;
+    ctx.chat.wordGameActive = true;
+    ctx.chat.wordToGuess = word;
 }
 
-async function processWordGuess(update, context) {
-    const chatId = update.effective_chat.id;
-    const userId = update.effective_user.id;
-    const guess = update.message.text.toLowerCase();
+async function processWordGuess(ctx) {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from.id;
+    const guess = ctx.message.text.toLowerCase();
 
-    if (!context.chat_data.word_to_guess) {
+    if (!ctx.chat.wordToGuess) {
         return;
     }
 
-    const correctWord = context.chat_data.word_to_guess;
+    const correctWord = ctx.chat.wordToGuess;
 
     if (guess === correctWord) {
-        delete context.chat_data.word_to_guess;
-        context.chat_data.word_game_active = false;
+        delete ctx.chat.wordToGuess;
+        ctx.chat.wordGameActive = false;
 
-        await reactToMessage(chatId, update.message.message_id);
+        await reactToMessage(chatId, ctx.message.message_id);
 
         let user = await ctx.db.destinationCollection.findOne({ id: userId });
         if (user) {
@@ -291,15 +295,15 @@ async function processWordGuess(update, context) {
             const newBalance = currentBalance + 40;
             await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
 
-            await update.message.reply_text(
-                `🎉 Congratulations ${update.effective_user.first_name}! You guessed the word correctly: ${correctWord}\n` +
+            await ctx.reply(
+                `🎉 Congratulations ${ctx.from.first_name}! You guessed the word correctly: ${correctWord}\n` +
                 `You've earned 40 coins! Your new balance is ${newBalance} coins.`
             );
         } else {
             await ctx.db.destinationCollection.insertOne({ id: userId, balance: 40 });
 
-            await update.message.reply_text(
-                `🎉 Congratulations ${update.effective_user.first_name}! You guessed the word correctly: ${correctWord}\n` +
+            await ctx.reply(
+                `🎉 Congratulations ${ctx.from.first_name}! You guessed the word correctly: ${correctWord}\n` +
                 "You've earned 40 coins! Your new balance is 40 coins."
             );
         }
@@ -307,11 +311,11 @@ async function processWordGuess(update, context) {
         let groupUserTotal = await ctx.db.groupUserTotalsCollection.findOne({ user_id: userId, group_id: chatId });
         if (groupUserTotal) {
             const updateFields = {};
-            if (update.effective_user.username && update.effective_user.username !== groupUserTotal.username) {
-                updateFields.username = update.effective_user.username;
+            if (ctx.from.username && ctx.from.username !== groupUserTotal.username) {
+                updateFields.username = ctx.from.username;
             }
-            if (update.effective_user.first_name !== groupUserTotal.first_name) {
-                updateFields.first_name = update.effective_user.first_name;
+            if (ctx.from.first_name !== groupUserTotal.first_name) {
+                updateFields.first_name = ctx.from.first_name;
             }
             if (Object.keys(updateFields).length > 0) {
                 await ctx.db.groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $set: updateFields });
@@ -322,8 +326,9 @@ async function processWordGuess(update, context) {
             await ctx.db.groupUserTotalsCollection.insertOne({
                 user_id: userId,
                 group_id: chatId,
-                username: update.effective_user.username,
-                first_name: update.effective_user.first_name,
+                username: ctx.from.username,
+                first_name: ctx.from.first_name,
+                
                 count: 1,
             });
         }
@@ -331,8 +336,8 @@ async function processWordGuess(update, context) {
         let groupInfo = await ctx.db.topGlobalGroupsCollection.findOne({ group_id: chatId });
         if (groupInfo) {
             const updateFields = {};
-            if (update.effective_chat.title !== groupInfo.group_name) {
-                updateFields.group_name = update.effective_chat.title;
+            if (ctx.chat.title !== groupInfo.group_name) {
+                updateFields.group_name = ctx.chat.title;
             }
             if (Object.keys(updateFields).length > 0) {
                 await ctx.db.topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $set: updateFields });
@@ -342,7 +347,7 @@ async function processWordGuess(update, context) {
         } else {
             await ctx.db.topGlobalGroupsCollection.insertOne({
                 group_id: chatId,
-                group_name: update.effective_chat.title,
+                group_name: ctx.chat.title,
                 count: 1,
             });
         }
@@ -350,5 +355,9 @@ async function processWordGuess(update, context) {
 }
 
 module.exports = {
-  messageCounter2
+    messageCounter2,
+    startMathGame,
+    startWordGame,
+    processMathGuess,
+    processWordGuess
 };
