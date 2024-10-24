@@ -313,11 +313,10 @@ async function nowCommand(ctx) {
 }
 
 
-async function messageCounter(update, context) {
-    const chatId = update.effective_chat.id.toString();
-    const userId = update.effective_user.id;
-
-    if (!['group', 'supergroup'].includes(update.effective_chat.type)) {
+async function messageCounter(ctx) {
+    const chatId = ctx.chat.id.toString();
+    const userId = ctx.from.id;
+    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
         return;
     }
 
@@ -333,7 +332,7 @@ async function messageCounter(update, context) {
                 if (userId in warnedUsers && Date.now() - warnedUsers[userId] < 600000) {
                     return;
                 } else {
-                    await update.message.reply_text(`⚠️ Don't Spam ${update.effective_user.first_name}...\nYour Messages Will be ignored for 10 Minutes...`);
+                    await ctx.reply(`⚠️ Don't Spam ${ctx.from.first_name}...\nYour Messages Will be ignored for 10 Minutes...`);
                     warnedUsers[userId] = Date.now();
                     return;
                 }
@@ -352,92 +351,92 @@ async function messageCounter(update, context) {
         // Randomly start math game if count reaches 75
         if (messageCounts[chatId].wordGame >= 5) {
             if (Math.random() < 0.5) {  // Randomly choose to start the math game
-                await startMathGame(update, context);
+                await startMathGame(ctx);
             }
             messageCounts[chatId].wordGame = 0;  // Reset word game count
         }
 
         // Send character image if count reaches 100
         if (messageCounts[chatId].character >= 4) {
-            await sendImage(update, context);
+            await sendImage(ctx);
             messageCounts[chatId].character = 0;  // Reset character count
         }
 
         // Reset math game count, but keep track for another game if active
-        if (context.chat_data.mathGameActive) {
-            await processMathGuess(update, context);
+        if (ctx.chat_data.mathGameActive) {
+            await processMathGuess(ctx);
         }
 
         if (chatId in lastCharacters) {
-            await guess(update, context);
+            await guess(ctx);
         }
 
         // Check if word game is active
-        if (context.chat_data.wordGameActive) {
-            await startWordGame(update, context);
+        if (ctx.chat_data.wordGameActive) {
+            await startWordGame(ctx);
         }
     });
 
-            // Process character guess if active
-        if (chatId in lastCharacters) {
-            const guess = ctx.message.text.toLowerCase();
-            const nameParts = lastCharacters[chatId].name.toLowerCase().split(' ');
-            if (JSON.stringify(nameParts.sort()) === JSON.stringify(guess.split(' ').sort()) || nameParts.includes(guess)) {
-                // Correct guess logic
-                firstCorrectGuesses[chatId] = userId;
-                const user = await destinationCollection.findOne({ id: userId });
-                if (user) {
-                    const updateFields = {};
-                    if (ctx.from.username && ctx.from.username !== user.username) {
-                        updateFields.username = ctx.from.username;
-                    }
-                    if (ctx.from.first_name !== user.first_name) {
-                        updateFields.first_name = ctx.from.first_name;
-                    }
-                    if (Object.keys(updateFields).length > 0) {
-                        await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
-                    }
-                    await destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
-                } else if (ctx.from.username) {
-                    await destinationCollection.insertOne({
-                        id: userId,
-                        username: ctx.from.username,
-                        first_name: ctx.from.first_name,
-                        characters: [lastCharacters[chatId]],
-                    });
+    // Process character guess if active
+    if (chatId in lastCharacters) {
+        const guess = ctx.message.text.toLowerCase();
+        const nameParts = lastCharacters[chatId].name.toLowerCase().split(' ');
+        if (JSON.stringify(nameParts.sort()) === JSON.stringify(guess.split(' ').sort()) || nameParts.includes(guess)) {
+            // Correct guess logic
+            firstCorrectGuesses[chatId] = userId;
+            const user = await destinationCollection.findOne({ id: userId });
+            if (user) {
+                const updateFields = {};
+                if (ctx.from.username && ctx.from.username !== user.username) {
+                    updateFields.username = ctx.from.username;
                 }
-                await reactToMessage(chatId, ctx.message.message_id);
-                const userBalance = await destinationCollection.findOne({ id: userId });
-                let newBalance = 40;
-                if (userBalance) {
-                    newBalance = (userBalance.balance || 0) + 40;
-                    await destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
-                } else {
-                    await destinationCollection.insertOne({ id: userId, balance: newBalance });
+                if (ctx.from.first_name !== user.first_name) {
+                    updateFields.first_name = ctx.from.first_name;
                 }
-                const keyboard = Markup.inlineKeyboard([
-                    [Markup.button.switchToChat("See Harem", `collection.${userId}`)]
-                ]);
-                await ctx.reply(
-                    `🌟 <b><a href="tg://user?id=${userId}">${ctx.from.first_name}</a></b>, you've captured a new character! 🎊\n\n` +
-                    `📛 𝗡𝗔𝗠𝗘: <b>${lastCharacters[chatId].name}</b> \n` +
-                    `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${lastCharacters[chatId].anime}</b> \n` +
-                    `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${lastCharacters[chatId].rarity}</b>\n\n` +
-                    'This magical being has been added to your harem. Use /harem to view your growing collection!',
-                    { parse_mode: 'HTML', ...keyboard }
-                );
+                if (Object.keys(updateFields).length > 0) {
+                    await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
+                }
+                await destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
+            } else if (ctx.from.username) {
+                await destinationCollection.insertOne({
+                    id: userId,
+                    username: ctx.from.username,
+                    first_name: ctx.from.first_name,
+                    characters: [lastCharacters[chatId]],
+                });
             }
-            // No response for incorrect guesses without the command
+            await reactToMessage(chatId, ctx.message.message_id);
+            const userBalance = await destinationCollection.findOne({ id: userId });
+            let newBalance = 40;
+            if (userBalance) {
+                newBalance = (userBalance.balance || 0) + 40;
+                await destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
+            } else {
+                await destinationCollection.insertOne({ id: userId, balance: newBalance });
+            }
+            const keyboard = Markup.inlineKeyboard([
+                [Markup.button.switchToChat("See Harem", `collection.${userId}`)]
+            ]);
+            await ctx.reply(
+                `🌟 <b><a href="tg://user?id=${userId}">${ctx.from.first_name}</a></b>, you've captured a new character! 🎊\n\n` +
+                `📛 𝗡𝗔𝗠𝗘: <b>${lastCharacters[chatId].name}</b> \n` +
+                `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${lastCharacters[chatId].anime}</b> \n` +
+                `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${lastCharacters[chatId].rarity}</b>\n\n` +
+                'This magical being has been added to your harem. Use /harem to view your growing collection!',
+                { parse_mode: 'HTML', ...keyboard }
+            );
         }
-    
+        // No response for incorrect guesses without the command
+    }
+
     const user = await destinationCollection.findOne({ id: userId });
     if (user) {
         const updateFields = {};
-        if (update.effective_user.username && update.effective_user.username !== user.username) {
-            updateFields.username = update.effective_user.username;
+        if (ctx.from.username && ctx.from.username !== user.username) {
+            updateFields.username = ctx.from.username;
         }
-        if (update.effective_user.first_name !== user.first_name) {
-            updateFields.first_name = update.effective_user.first_name;
+        if (ctx.from.first_name !== user.first_name) {
+            updateFields.first_name = ctx.from.first_name;
         }
         if (Object.keys(updateFields).length > 0) {
             await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
@@ -447,11 +446,11 @@ async function messageCounter(update, context) {
     const groupUserTotal = await groupUserTotalsCollection.findOne({ user_id: userId, group_id: chatId });
     if (groupUserTotal) {
         const updateFields = {};
-        if (update.effective_user.username && update.effective_user.username !== groupUserTotal.username) {
-            updateFields.username = update.effective_user.username;
+        if (ctx.from.username && ctx.from.username !== groupUserTotal.username) {
+            updateFields.username = ctx.from.username;
         }
-        if (update.effective_user.first_name !== groupUserTotal.first_name) {
-            updateFields.first_name = update.effective_user.first_name;
+        if (ctx.from.first_name !== groupUserTotal.first_name) {
+            updateFields.first_name = ctx.from.first_name;
         }
         if (Object.keys(updateFields).length > 0) {
             await groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $set: updateFields });
@@ -462,8 +461,8 @@ async function messageCounter(update, context) {
         await groupUserTotalsCollection.insertOne({
             user_id: userId,
             group_id: chatId,
-            username: update.effective_user.username,
-            first_name: update.effective_user.first_name,
+            username: ctx.from.username,
+            first_name: ctx.from.first_name,
             count: 1,
         });
     }
@@ -471,8 +470,8 @@ async function messageCounter(update, context) {
     const groupInfo = await topGlobalGroupsCollection.findOne({ group_id: chatId });
     if (groupInfo) {
         const updateFields = {};
-        if (update.effective_chat.title !== groupInfo.group_name) {
-            updateFields.group_name = update.effective_chat.title;
+        if (ctx.chat.title !== groupInfo.group_name) {
+            updateFields.group_name = ctx.chat.title;
         }
         if (Object.keys(updateFields).length > 0) {
             await topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $set: updateFields });
@@ -482,13 +481,11 @@ async function messageCounter(update, context) {
     } else {
         await topGlobalGroupsCollection.insertOne({
             group_id: chatId,
-            group_name: update.effective_chat.title,
+            group_name: ctx.chat.title,
             count: 1,
         });
     }
 }
-
-
 
 // Helper functions for statistics updates
 async function updateUserInfo(userId, ctx) {
