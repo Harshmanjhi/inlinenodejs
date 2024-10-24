@@ -270,7 +270,7 @@ async function favCommand(ctx) {
 
     const characterId = ctx.message.text.split(' ')[1];
 
-    const user = await userCollection.findOne({ id: userId });
+    const user = await destinationCollection.findOne({ id: userId });
     if (!user) {
         await ctx.reply('You have not Guessed any characters yet....');
         return;
@@ -282,7 +282,7 @@ async function favCommand(ctx) {
         return;
     }
 
-    await userCollection.updateOne({ id: userId }, { $set: { favorites: [characterId] } });
+    await destinationCollection.updateOne({ id: userId }, { $set: { favorites: [characterId] } });
 
     await ctx.reply(`Character ${character.name} has been added to your favorite...`);
 }
