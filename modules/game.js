@@ -1,7 +1,6 @@
 const AsyncLock = require('async-lock');
 const { createCanvas, loadImage } = require('canvas');
 const fetch = require('node-fetch');
-const { reactToMessage } = require('./bot');
 
 const locks = {};
 const lastUser = {};
@@ -9,6 +8,17 @@ const warnedUsers = {};
 const messageCounts = {};
 const lastCharacters = {};
 const firstCorrectGuesses = {};
+
+const emojis = ["👍", "😘", "❤️", "🔥", "🥰", "🤩", "💘", "💯", "✨", "⚡️", "🏆", "🤭", "🎉"];
+
+async function reactToMessage(chatId, messageId) {
+    const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    try {
+        await bot.telegram.setMessageReaction(chatId, messageId, [{ type: "emoji", emoji: randomEmoji }]);
+    } catch (error) {
+        console.error("Error setting reaction:", error);
+    }
+}
 
 async function messageCounter2(ctx) {
     const chatId = ctx.chat.id.toString();
