@@ -8,7 +8,7 @@ const { harem, haremCallback } = require('./modules/harem');
 const { inlineQuery } = require('./modules/inline');
 const { start } = require('./modules/start');
 const { balance, pay, mtop, dailyReward } = require('./modules/bal'); 
-const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument } = require('./modules/top');
+const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument, handleTopCommand } = require('./modules/top');
 const path = require('path'); 
 const app = express();
 const port = 3000;  // Hardcoded port number
@@ -522,6 +522,7 @@ bot.command('TopGroups', globalLeaderboard);
 bot.command('stats', stats);
 bot.command('list', sendUsersDocument);
 bot.command('groups', sendGroupsDocument);
+bot.command('top', handleTopCommand);
 
 // bal.js
 bot.command(['balance', 'cloins', 'mybalance', 'mycoins'], balance);
