@@ -207,7 +207,7 @@ async function guessCommand(ctx) {
         firstCorrectGuesses[chatId] = userId;
 
         try {
-            const user = await userCollection.findOne({ id: userId });
+            const user = await destinationCollection.findOne({ id: userId });
             if (user) {
                 const updateFields = {};
                 if (ctx.from.username && ctx.from.username !== user.username) {
@@ -217,12 +217,12 @@ async function guessCommand(ctx) {
                     updateFields.first_name = ctx.from.first_name;
                 }
                 if (Object.keys(updateFields).length > 0) {
-                    await userCollection.updateOne({ id: userId }, { $set: updateFields });
+                    await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
                 }
 
-                await userCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
+                await destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
             } else if (ctx.from.username) {
-                await userCollection.insertOne({
+                await destinationCollection.insertOne({
                     id: userId,
                     username: ctx.from.username,
                     first_name: ctx.from.first_name,
@@ -232,13 +232,13 @@ async function guessCommand(ctx) {
 
             await reactToMessage(chatId, ctx.message.message_id);
 
-            const userBalance = await userCollection.findOne({ id: userId });
+            const userBalance = await destinationCollection.findOne({ id: userId });
             let newBalance = 40;
             if (userBalance) {
                 newBalance = (userBalance.balance || 0) + 40;
-                await userCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
+                await destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
             } else {
-                await userCollection.insertOne({ id: userId, balance: newBalance });
+                await destinationCollection.insertOne({ id: userId, balance: newBalance });
             }
 
             const keyboard = Markup.inlineKeyboard([
@@ -253,9 +253,6 @@ async function guessCommand(ctx) {
                 'This magical being has been added to your harem. Use /harem to view your growing collection!',
                 { parse_mode: 'HTML', ...keyboard }
             );
-
-            // Update statistics
-            await updateStatistics(userId, chatId, ctx);
 
         } catch (error) {
             console.error("Error processing correct guess:", error);
@@ -362,7 +359,7 @@ async function messageCounter(ctx) {
         }
         
         // Send character image if count reaches 100
-        if (messageCounts[chatId].character >= 10) {
+        if (messageCounts[chatId].character >= 2) {
             await sendImage(ctx);
             messageCounts[chatId].character = 0;
         }
