@@ -588,7 +588,8 @@ function generateEquation(level = null) {
 
 async function createEquationImage(equation, width = 1060, height = 596) {
     const response = await fetch("https://files.catbox.moe/rbz6no.jpg");
-    const background = await loadImage(await response.buffer());
+    const buffer = await response.buffer();
+    const background = await loadImage(buffer);
 
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
