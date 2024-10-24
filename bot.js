@@ -413,8 +413,6 @@ async function messageCounter(ctx) {
                     'This magical being has been added to your harem. Use /harem to view your growing collection!',
                     { parse_mode: 'HTML', ...keyboard }
                 );
-                // Update statistics
-                await updateStatistics(userId, chatId, ctx);
             }
             // No response for incorrect guesses without the command
         }
