@@ -178,72 +178,89 @@ async function sendImage(ctx) {
 async function guessCommand(ctx) {
     const chatId = ctx.chat.id;
     const userId = ctx.from.id;
+
     if (!(chatId in lastCharacters)) {
         await ctx.reply('There is no active character to guess.');
         return;
     }
+
     if (chatId in firstCorrectGuesses) {
         await ctx.reply('❌ Oops! Someone already guessed this character. Better luck next time, adventurer! 🍀');
         return;
     }
+
     const guess = ctx.message.text.split(' ').slice(1).join(' ').toLowerCase();
-    if (guess.includes("()") || guess.includes("&")) {
-        await ctx.reply("Nahh You Can't use This Types of words in your guess..❌️");
+
+    if (!guess) {
+        await ctx.reply('Please provide a guess after the command.');
         return;
     }
+
+    if (guess.includes("()") || guess.includes("&")) {
+        await ctx.reply("Nah, you can't use these types of words in your guess... ❌️");
+        return;
+    }
+
     const nameParts = lastCharacters[chatId].name.toLowerCase().split(' ');
+
     if (JSON.stringify(nameParts.sort()) === JSON.stringify(guess.split(' ').sort()) || nameParts.includes(guess)) {
         firstCorrectGuesses[chatId] = userId;
 
-        const user = await userCollection.findOne({ id: userId });
-        if (user) {
-            const updateFields = {};
-            if (ctx.from.username && ctx.from.username !== user.username) {
-                updateFields.username = ctx.from.username;
-            }
-            if (ctx.from.first_name !== user.first_name) {
-                updateFields.first_name = ctx.from.first_name;
-            }
-            if (Object.keys(updateFields).length > 0) {
-                await userCollection.updateOne({ id: userId }, { $set: updateFields });
+        try {
+            const user = await userCollection.findOne({ id: userId });
+            if (user) {
+                const updateFields = {};
+                if (ctx.from.username && ctx.from.username !== user.username) {
+                    updateFields.username = ctx.from.username;
+                }
+                if (ctx.from.first_name !== user.first_name) {
+                    updateFields.first_name = ctx.from.first_name;
+                }
+                if (Object.keys(updateFields).length > 0) {
+                    await userCollection.updateOne({ id: userId }, { $set: updateFields });
+                }
+
+                await userCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
+            } else if (ctx.from.username) {
+                await userCollection.insertOne({
+                    id: userId,
+                    username: ctx.from.username,
+                    first_name: ctx.from.first_name,
+                    characters: [lastCharacters[chatId]],
+                });
             }
 
-            await userCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
+            await reactToMessage(chatId, ctx.message.message_id);
 
-        } else if (ctx.from.username) {
-            await userCollection.insertOne({
-                id: userId,
-                username: ctx.from.username,
-                first_name: ctx.from.first_name,
-                characters: [lastCharacters[chatId]],
-            });
+            const userBalance = await userCollection.findOne({ id: userId });
+            let newBalance = 40;
+            if (userBalance) {
+                newBalance = (userBalance.balance || 0) + 40;
+                await userCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
+            } else {
+                await userCollection.insertOne({ id: userId, balance: newBalance });
+            }
+
+            const keyboard = Markup.inlineKeyboard([
+                [Markup.button.switchToChat("See Harem", `collection.${userId}`)]
+            ]);
+
+            await ctx.reply(
+                `🌟 <b><a href="tg://user?id=${userId}">${ctx.from.first_name}</a></b>, you've captured a new character! 🎊\n\n` +
+                `📛 𝗡𝗔𝗠𝗘: <b>${lastCharacters[chatId].name}</b> \n` +
+                `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${lastCharacters[chatId].anime}</b> \n` +
+                `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${lastCharacters[chatId].rarity}</b>\n\n` +
+                'This magical being has been added to your harem. Use /harem to view your growing collection!',
+                { parse_mode: 'HTML', ...keyboard }
+            );
+
+            // Update statistics
+            await updateStatistics(userId, chatId, ctx);
+
+        } catch (error) {
+            console.error("Error processing correct guess:", error);
+            await ctx.reply("An error occurred while processing your guess. Please try again later.");
         }
-
-        await reactToMessage(chatId, ctx.message.message_id);
-
-        const userBalance = await userCollection.findOne({ id: userId });
-        let newBalance = 40;
-        if (userBalance) {
-            newBalance = (userBalance.balance || 0) + 40;
-            await userCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
-        } else {
-            await userCollection.insertOne({ id: userId, balance: newBalance });
-        }
-
-        const keyboard = Markup.inlineKeyboard([
-            [Markup.button.switchToChat("See Harem", `collection.${userId}`)]
-        ]);
-
-        await ctx.reply(
-            `🌟 <b><a href="tg://user?id=${userId}">${ctx.from.first_name}</a></b>, you've captured a new character! 🎊\n\n` +
-            `📛 𝗡𝗔𝗠𝗘: <b>${lastCharacters[chatId].name}</b> \n` +
-            `🌈 𝗔𝗡𝗜𝗠𝗘: <b>${lastCharacters[chatId].anime}</b> \n` +
-            `✨ 𝗥𝗔𝗥𝗜𝗧𝗬: <b>${lastCharacters[chatId].rarity}</b>\n\n` +
-            'This magical being has been added to your harem. Use /harem to view your growing collection!',
-            { parse_mode:  'HTML', ...keyboard }
-        );
-
-        // Update statistic
     } else {
         await ctx.reply('❌ Not quite right, brave guesser! Try again and unveil the mystery character! 🕵️‍♂️');
     }
