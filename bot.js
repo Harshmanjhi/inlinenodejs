@@ -313,17 +313,20 @@ async function nowCommand(ctx) {
     }
 }
 
-// Message handler
-async function messageCounter(ctx) {
-    const chatId = ctx.chat.id.toString();
-    const userId = ctx.from.id;
-    if (!['group', 'supergroup'].includes(ctx.chat.type)) {
+
+async function messageCounter(update, context) {
+    const chatId = update.effective_chat.id.toString();
+    const userId = update.effective_user.id;
+
+    if (!['group', 'supergroup'].includes(update.effective_chat.type)) {
         return;
     }
+
     if (!(chatId in locks)) {
         locks[chatId] = new AsyncLock();
     }
     const lock = locks[chatId];
+
     await lock.acquire(chatId, async () => {
         if (chatId in lastUser && lastUser[chatId].userId === userId) {
             lastUser[chatId].count += 1;
@@ -331,7 +334,7 @@ async function messageCounter(ctx) {
                 if (userId in warnedUsers && Date.now() - warnedUsers[userId] < 600000) {
                     return;
                 } else {
-                    await ctx.reply(`⚠️ Don't Spam ${ctx.from.first_name}...\nYour Messages Will be ignored for 10 Minutes...`);
+                    await update.message.reply_text(`⚠️ Don't Spam ${update.effective_user.first_name}...\nYour Messages Will be ignored for 10 Minutes...`);
                     warnedUsers[userId] = Date.now();
                     return;
                 }
@@ -339,33 +342,44 @@ async function messageCounter(ctx) {
         } else {
             lastUser[chatId] = { userId: userId, count: 1 };
         }
+
         if (!(chatId in messageCounts)) {
             messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
         }
         messageCounts[chatId].wordGame += 1;
         messageCounts[chatId].character += 1;
         messageCounts[chatId].mathGame += 1;
-        
+
         // Randomly start math game if count reaches 75
-        if (messageCounts[chatId].wordGame >= 5000000) {
-            if (Math.random() < 0.5) {
-                await startMathGame(ctx);
+        if (messageCounts[chatId].wordGame >= 75) {
+            if (Math.random() < 0.5) {  // Randomly choose to start the math game
+                await startMathGame(update, context);
             }
-            messageCounts[chatId].wordGame = 0;
+            messageCounts[chatId].wordGame = 0;  // Reset word game count
         }
-        
+
         // Send character image if count reaches 100
-        if (messageCounts[chatId].character >= 2) {
-            await sendImage(ctx);
-            messageCounts[chatId].character = 0;
+        if (messageCounts[chatId].character >= 100) {
+            await sendImage(update, context);
+            messageCounts[chatId].character = 0;  // Reset character count
         }
-        
-        // Process math game guess if active
-        if (ctx.chat.mathGameActive) {
-            await processMathGuess(ctx);
+
+        // Reset math game count, but keep track for another game if active
+        if (context.chat_data.mathGameActive) {
+            await processMathGuess(update, context);
         }
-        
-        // Process character guess if active
+
+        if (chatId in lastCharacters) {
+            await guess(update, context);
+        }
+
+        // Check if word game is active
+        if (context.chat_data.wordGameActive) {
+            await startWordGame(update, context);
+        }
+    });
+
+            // Process character guess if active
         if (chatId in lastCharacters) {
             const guess = ctx.message.text.toLowerCase();
             const nameParts = lastCharacters[chatId].name.toLowerCase().split(' ');
@@ -416,19 +430,66 @@ async function messageCounter(ctx) {
             }
             // No response for incorrect guesses without the command
         }
-        
-        // Process word game guess if active
-        if (ctx.chat.wordGameActive) {
-            await processWordGuess(ctx);
+    
+    const user = await destinationCollection.findOne({ id: userId });
+    if (user) {
+        const updateFields = {};
+        if (update.effective_user.username && update.effective_user.username !== user.username) {
+            updateFields.username = update.effective_user.username;
         }
-    });
-    
-    // Update user information
-    await updateUserInfo(userId, ctx);
-    
-    // Update group statistics
-    await updateGroupStatistics(userId, chatId, ctx);
+        if (update.effective_user.first_name !== user.first_name) {
+            updateFields.first_name = update.effective_user.first_name;
+        }
+        if (Object.keys(updateFields).length > 0) {
+            await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
+        }
+    }
+
+    const groupUserTotal = await groupUserTotalsCollection.findOne({ user_id: userId, group_id: chatId });
+    if (groupUserTotal) {
+        const updateFields = {};
+        if (update.effective_user.username && update.effective_user.username !== groupUserTotal.username) {
+            updateFields.username = update.effective_user.username;
+        }
+        if (update.effective_user.first_name !== groupUserTotal.first_name) {
+            updateFields.first_name = update.effective_user.first_name;
+        }
+        if (Object.keys(updateFields).length > 0) {
+            await groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $set: updateFields });
+        }
+        
+        await groupUserTotalsCollection.updateOne({ user_id: userId, group_id: chatId }, { $inc: { count: 1 } });
+    } else {
+        await groupUserTotalsCollection.insertOne({
+            user_id: userId,
+            group_id: chatId,
+            username: update.effective_user.username,
+            first_name: update.effective_user.first_name,
+            count: 1,
+        });
+    }
+
+    const groupInfo = await topGlobalGroupsCollection.findOne({ group_id: chatId });
+    if (groupInfo) {
+        const updateFields = {};
+        if (update.effective_chat.title !== groupInfo.group_name) {
+            updateFields.group_name = update.effective_chat.title;
+        }
+        if (Object.keys(updateFields).length > 0) {
+            await topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $set: updateFields });
+        }
+        
+        await topGlobalGroupsCollection.updateOne({ group_id: chatId }, { $inc: { count: 1 } });
+    } else {
+        await topGlobalGroupsCollection.insertOne({
+            group_id: chatId,
+            group_name: update.effective_chat.title,
+            count: 1,
+        });
+    }
 }
+
+
 
 // Helper functions for statistics updates
 async function updateUserInfo(userId, ctx) {
