@@ -13,8 +13,6 @@ const inlineQuery = async (ctx) => {
         let allCharacters = [];
         let user = null;
     
-        // console.log('Received inline query:', query);
-    
         // Process the query based on user collection or general character search
         if (query.startsWith('collection.')) {
             const [userId, ...searchTerms] = query.split(' ')[0].split('.').slice(1);
@@ -52,8 +50,6 @@ const inlineQuery = async (ctx) => {
             allCharacters = allCharactersCache.get('all_characters') || await ctx.db.destinationCharCollection.find({}).toArray();
             allCharactersCache.set('all_characters', allCharacters);
         }
-    
-        // console.log('Characters fetched:', allCharacters.length);
     
         // Prepare the characters for response
         const characters = allCharacters.slice(offset, offset + 10);
@@ -96,7 +92,6 @@ const inlineQuery = async (ctx) => {
     
         await ctx.answerInlineQuery(results, { next_offset: nextOffset, cache_time: 5 });
     } catch (error) {
-        // console.error('Error processing inline query:', error);
         await ctx.answerInlineQuery([], { cache_time: 5 }); // Respond with empty results in case of error
     }
 };
