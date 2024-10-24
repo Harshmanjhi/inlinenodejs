@@ -12,7 +12,7 @@ const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument, h
 const fs = require('fs');
 const path = require('path');
 const app = express();
-const port = 8080;  // Hardcoded port number
+const port = 8000;  // Hardcoded port number
 
 require('dotenv').config();
 
