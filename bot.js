@@ -422,7 +422,7 @@ async function messageCounter(ctx) {
             if (JSON.stringify(nameParts.sort()) === JSON.stringify(guess.split(' ').sort()) || nameParts.includes(guess)) {
                 // Correct guess logic
                 firstCorrectGuesses[chatId] = userId;
-                const user = await destinationCollection.findOne({ id: userId });
+                const user = await ctx.db.destinationCollection.findOne({ id: userId });
 
                 if (user) {
                     const updateFields = {};
@@ -435,9 +435,9 @@ async function messageCounter(ctx) {
                     if (Object.keys(updateFields).length > 0) {
                         await destinationCollection.updateOne({ id: userId }, { $set: updateFields });
                     }
-                    await destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
+                    await ctx.db.destinationCollection.updateOne({ id: userId }, { $push: { characters: lastCharacters[chatId] } });
                 } else if (ctx.from.username) {
-                    await destinationCollection.insertOne({
+                    await ctx.db.destinationCollection.insertOne({
                         id: userId,
                         username: ctx.from.username,
                         first_name: ctx.from.first_name,
@@ -447,14 +447,14 @@ async function messageCounter(ctx) {
 
                 await reactToMessage(chatId, ctx.message.message_id);
 
-                const userBalance = await destinationCollection.findOne({ id: userId });
+                const userBalance = await ctx.db.destinationCollection.findOne({ id: userId });
                 let newBalance = 40;
 
                 if (userBalance) {
                     newBalance = (userBalance.balance || 0) + 40;
-                    await destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
+                    await ctx.db.destinationCollection.updateOne({ id: userId }, { $set: { balance: newBalance } });
                 } else {
-                    await destinationCollection.insertOne({ id: userId, balance: newBalance });
+                    await ctx.db.destinationCollection.insertOne({ id: userId, balance: newBalance });
                 }
 
                 const keyboard = Markup.inlineKeyboard([
