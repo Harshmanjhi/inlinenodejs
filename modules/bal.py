@@ -104,9 +104,9 @@ async function dailyReward(ctx) {
 
 // Export the inline query handler
 module.exports = {
-  balance ,
+  balance,
   dailyReward, 
-  pay, 
-  mtop,
-  dailyReward
+  pay,
+  mtop
 };
+
