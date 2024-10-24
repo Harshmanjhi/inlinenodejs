@@ -78,6 +78,42 @@ async function connectToDatabase() {
     }
 }
 
+async function importModules() {
+  const modulesDir = path.join(__dirname, 'modules');
+  const files = fs.readdirSync(modulesDir);
+
+  for (const file of files) {
+    if (file.endsWith('.js')) {
+      const modulePath = path.join(modulesDir, file);
+      try {
+        const module = require(modulePath);
+        
+        // If the module exports a function, run it with the bot instance
+        if (typeof module === 'function') {
+          module(bot);
+        } 
+        // If the module exports an object with setup function, run it
+        else if (typeof module === 'object' && typeof module.setup === 'function') {
+          module.setup(bot);
+        }
+        // Otherwise, assume it exports individual handlers and register them
+        else if (typeof module === 'object') {
+          Object.entries(module).forEach(([key, handler]) => {
+            if (typeof handler === 'function') {
+              bot.use(handler);
+            }
+          });
+        }
+        
+        console.log(`Loaded module: ${file}`);
+      } catch (error) {
+        console.error(`Error loading module ${file}:`, error);
+      }
+    }
+  }
+}
+
+
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     try {
@@ -553,11 +589,17 @@ app.listen(port, () => {
     console.log(`Web server running on port ${port}`);
 });
 
-// Start the bot
-async function main() {
-    await connectToDatabase();
-    bot.launch();
-    console.log("Bot started");
-}
 
-main();
+
+importModules().then(() => {
+  await connectToDatabase();
+  bot.launch();
+  console.log('Bot is running!');
+}).catch(error => {
+  console.error('Failed to start the bot:', error);
+});
+
+// Enable graceful stop
+process.once('SIGINT', () => bot.stop('SIGINT'));
+process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
