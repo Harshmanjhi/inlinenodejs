@@ -118,8 +118,6 @@ async function sendImage(ctx) {
 
     const availableCharacters = ctx.user_data.available_characters;
 
-    // Log available characters
-    console.log("Available Characters:", availableCharacters);
     if (availableCharacters.length === 0) {
         await ctx.reply("No characters available to send.");
         return; // Exit if no characters are available
