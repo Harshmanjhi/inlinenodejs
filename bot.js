@@ -50,68 +50,33 @@ const firstCorrectGuesses = {};
   const { MongoClient } = require('mongodb');
   require('dotenv').config();
   
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://harshmanjhi1801:webapp@cluster0.xxwc4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
-
-  const DB_NAME = 'gaming_create';
-
-  let client = null;
-  let userTotalsCollection, groupUserTotalsCollection, topGlobalGroupsCollection, pmUsersCollection, destinationCollection, destinationCharCollection;
-
-async function connectToMongoDB() {
-  if (client && client.isConnected()) {
-    console.log('Already connected to MongoDB');
-    return db;
+  const MONGODB_URI = process.env.MONGODB_URI;
+  const client = new MongoClient(MONGODB_URI);
+  
+  let db, userTotalsCollection, groupUserTotalsCollection, topGlobalGroupsCollection, pmUsersCollection, destinationCollection, destinationCharCollection;
+  
+  async function connectToDatabase() {
+      try {
+          await client.connect();
+          console.log('Connected to MongoDB');
+  
+          // Set the database
+          db = client.db('gaming_create'); // Use 'gaming_create' as the database name
+  
+          // Initialize collections
+          userTotalsCollection = db.collection('gaming_totals');
+          groupUserTotalsCollection = db.collection('gaming_group_total');
+          topGlobalGroupsCollection = db.collection('gaming_global_groups');
+          pmUsersCollection = db.collection('gaming_pm_users');
+          destinationCollection = db.collection('gamimg_user_collection');
+          destinationCharCollection = db.collection('gaming_anime_characters');
+  
+          console.log('All collections initialized');
+      } catch (error) {
+          console.error('MongoDB connection error:', error);
+          process.exit(1);
+      }
   }
-
-  try {
-    client = new MongoClient(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverSelectionTimeoutMS: 5000,
-      maxPoolSize: 10 // Adjust based on your needs
-    });
-
-    await client.connect();
-    console.log('Connected to MongoDB');
-
-    db = client.db(DB_NAME);
-
-    // Initialize collections
-    const collections = {
-      userTotalsCollection: db.collection('gaming_totals'),
-      groupUserTotalsCollection: db.collection('gaming_group_total'),
-      topGlobalGroupsCollection: db.collection('gaming_global_groups'),
-      pmUsersCollection: db.collection('gaming_pm_users'),
-      destinationCollection: db.collection('gamimg_user_collection'),
-      destinationCharCollection: db.collection('gaming_anime_characters')
-    };
-
-    client.on('close', () => {
-      console.log('MongoDB connection closed. Attempting to reconnect...');
-      setTimeout(connectToMongoDB, 5000);
-    });
-
-    return collections;
-  } catch (error) {
-    console.error('Failed to connect to MongoDB', error);
-    setTimeout(connectToMongoDB, 5000);
-    return null;
-  }
-}
-
-async function getCollections() {
-  if (!client || !client.isConnected()) {
-    return await connectToMongoDB();
-  }
-  return {
-    userTotalsCollection: db.collection('gaming_totals'),
-    groupUserTotalsCollection: db.collection('gaming_group_total'),
-    topGlobalGroupsCollection: db.collection('gaming_global_groups'),
-    pmUsersCollection: db.collection('gaming_pm_users'),
-    destinationCollection: db.collection('gamimg_user_collection'),
-    destinationCharCollection: db.collection('gaming_anime_characters')
-  };
-}
 
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
@@ -585,7 +550,7 @@ app.listen(port, () => {
 
 // Start the bot
 async function main() {
-    await connectToMongoDB();
+    await connectToDatabase();
     bot.launch();
     console.log("Bot started");
 }
