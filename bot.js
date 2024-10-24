@@ -326,6 +326,7 @@ async function messageCounter(ctx) {
     const lock = locks[chatId];
 
     await lock.acquire(chatId, async () => {
+        // Anti-spam logic
         if (chatId in lastUser && lastUser[chatId].userId === userId) {
             lastUser[chatId].count += 1;
             if (lastUser[chatId].count >= 10) {
@@ -341,6 +342,7 @@ async function messageCounter(ctx) {
             lastUser[chatId] = { userId: userId, count: 1 };
         }
 
+        // Message counting for different game types
         if (!(chatId in messageCounts)) {
             messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
         }
@@ -348,21 +350,20 @@ async function messageCounter(ctx) {
         messageCounts[chatId].character += 1;
         messageCounts[chatId].mathGame += 1;
 
-        // Randomly start math game if count reaches 75
+        // Trigger different games based on message counts
         if (messageCounts[chatId].wordGame >= 5) {
-            if (Math.random() < 0.5) {  // Randomly choose to start the math game
+            if (Math.random() < 0.5) {
                 await startMathGame(ctx);
             }
-            messageCounts[chatId].wordGame = 0;  // Reset word game count
+            messageCounts[chatId].wordGame = 0;
         }
 
-        // Send character image if count reaches 100
         if (messageCounts[chatId].character >= 4) {
             await sendImage(ctx);
-            messageCounts[chatId].character = 0;  // Reset character count
+            messageCounts[chatId].character = 0;
         }
 
-        // Reset math game count, but keep track for another game if active
+        // Process ongoing games
         if (ctx.chat_data.mathGameActive) {
             await processMathGuess(ctx);
         }
@@ -371,7 +372,6 @@ async function messageCounter(ctx) {
             await guess(ctx);
         }
 
-        // Check if word game is active
         if (ctx.chat_data.wordGameActive) {
             await startWordGame(ctx);
         }
