@@ -7,6 +7,7 @@ const AsyncLock = require('async-lock');
 const { harem, haremCallback } = require('./modules/harem');
 const { inlineQuery } = require('./modules/inline');
 const { start } = require('./modules/start');
+const { messageCounter2 } = require('./modules/game');
 const { balance, pay, mtop, dailyReward } = require('./modules/bal'); 
 const { ctop, globalLeaderboard, stats, sendUsersDocument, sendGroupsDocument, handleTopCommand } = require('./modules/top');
 const path = require('path'); 
@@ -535,6 +536,7 @@ bot.on('inline_query', (ctx) => inlineQuery(ctx)); // Modify this line
 
 // Handle all messages
 bot.on('message', messageCounter);
+bot.on('message', messageCounter2);
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html')); // Serve index.html from the same directory
