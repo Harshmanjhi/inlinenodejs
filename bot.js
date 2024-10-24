@@ -81,7 +81,15 @@ async function reactToMessage(chatId, messageId) {
 
 async function sendImage(ctx) {
     const chatId = ctx.chat.id.toString();
-    const allCharacters = await destinationCharCollection.find({}).toArray();
+    const allCharacters = await destinationCharCollection.find({}).toArray().catch(error => {
+        console.error("Error fetching characters:", error);
+        return [];
+    });
+
+    if (!allCharacters || allCharacters.length === 0) {
+        await ctx.reply("No characters available to send.");
+        return;
+    }
 
     // Initialize chat data if it doesn't exist
     if (!chatData.has(chatId)) {
