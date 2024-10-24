@@ -507,6 +507,10 @@ bot.use((ctx, next) => {
     return next();
 });
 
+module.exports = {
+    reactToMessage
+};
+
 // *
 bot.command(['guess', 'protecc', 'collect', 'grab', 'hunt'], guessCommand);
 bot.command('fav', favCommand);
