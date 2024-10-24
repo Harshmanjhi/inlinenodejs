@@ -14,8 +14,6 @@ async function messageCounter2(ctx) {
     if (!(chatId in locks)) {
         locks[chatId] = new AsyncLock();
     }
-        } else {
-            lastUser[chatId] = { userId: userId, count: 1 };
         }
         if (!(chatId in messageCounts)) {
             messageCounts[chatId] = { wordGame: 0, character: 0, mathGame: 0 };
