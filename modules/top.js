@@ -99,10 +99,63 @@ async function sendGroupsDocument(ctx) {
     fs.unlinkSync('groups.txt'); // Remove file after sending
 }
 
+// /top command handler function
+async function handleTopCommand(ctx) {
+    try {
+
+        const photoUrl = PHOTO_URL;
+        
+        // Fetch users from the collection
+        const users = await ctx.db.destinationCollection.find().toArray();
+
+        // Sort top 10 users by character count
+        const topUsers = users.sort((a, b) => (b.characters?.length || 0) - (a.characters?.length || 0)).slice(0, 10);
+
+        if (topUsers.length > 0) {
+            // Prepare the message
+            let message = "<b>Top 10 Users by Number of Characters:</b>\n\n";
+
+            topUsers.forEach((user, idx) => {
+                const characterCount = user.characters?.length || 0;
+                const firstName = user.first_name || 'Unknown';
+                const userId = user.id;
+
+                let userLink = firstName;
+
+                if (userId) {
+                    if (user.username) {
+                        userLink = `<a href="https://t.me/${user.username}">${firstName}</a>`;
+                    } else {
+                        userLink = `<a href="tg://openmessage?user_id=${userId}">${firstName}</a>`;
+                    }
+                }
+
+                message += `${idx + 1}. ${userLink}: ${characterCount}\n`;
+            });
+
+            // Send the message with fixed photo
+            await ctx.replyWithPhoto(photoUrl, {
+                caption: message,
+                parse_mode: 'HTML'
+            });
+        } else {
+            await ctx.reply('No users found.');
+        }
+    } catch (err) {
+        console.error(err);
+        await ctx.reply('An error occurred while fetching the data.');
+    } finally {
+      // chutiya
+    }
+}
+
+// Register the /top command
+
 module.exports = {
     ctop,
     globalLeaderboard,
     stats,
     sendUsersDocument,
-    sendGroupsDocument
+    sendGroupsDocument,
+    handleTopCommand
 };
