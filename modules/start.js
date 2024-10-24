@@ -2,10 +2,12 @@ const { Markup } = require('telegraf');
 const { escape } = require('html-entities');
 const axios = require('axios');
 const fs = require('fs');
-const { BOT_USERNAME, SUPPORT_CHAT, UPDATE_CHAT, GROUP_ID } = process.env;
 
 const PHOTO_URL = 'https://envs.sh/A2J.jpg'; // img
 
+const SUPPORT_CHAT = '+IT7AiU48nBUyYjg1'
+const UPDATE_CHAT = '+IT7AiU48nBUyYjg1'
+const BOT_USERNAME = 'EpicArenaBot'
 // Upload file to Catbox
 const uploadToCatbox = async (filePath) => {
     const url = "https://catbox.moe/user/api.php";
