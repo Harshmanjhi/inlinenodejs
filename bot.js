@@ -113,7 +113,6 @@ async function importModules() {
   }
 }
 
-
 async function reactToMessage(chatId, messageId) {
     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
     try {
