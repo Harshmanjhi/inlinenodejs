@@ -101,16 +101,16 @@ const start = async (ctx) => {
     const url_button3 = Markup.button.url("📢 UPDATES", `https://t.me/${UPDATE_CHAT}`);
 
     // Create the inline keyboard
-    const keyboard = Markup.inlineKeyboard([
-        [url_button1], // First row with one button
-        [url_button2, url_button3] // Second row with two buttons
-    ]);
+let keyboard = Markup.inlineKeyboard([
+    [url_button1], // First row with one button
+    [url_button2, url_button3] // Second row with two buttons
+]);
 
-        keyboard = [[url_button1],
-                [url_button2, url_button3]]
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-   
+keyboard = [[url_button1],
+            [url_button2, url_button3]];
+
+const reply_markup = { inline_keyboard: keyboard }; // Make sure to construct this correctly
+
         // Send photo with caption and inline keyboard
         await ctx.telegram.sendPhoto(ctx.chat.id, PHOTO_URL, {
             caption: `🎮 ***Welcome to Epic Arena!***
@@ -130,7 +130,7 @@ Hey Adventurer! 👋 Ready for a thrilling quest?
 🏆 Compete, collect, and rise to the top!
 
 Let's make your group the ultimate gaming hub! 🚀`,
-            reply_markup: keyboard // Make sure to use reply_markup
+            reply_markup: reply_markup // Make sure to use reply_markup
         });
     } catch (error) {
         console.error(`Error in start command: ${error.message}`);
