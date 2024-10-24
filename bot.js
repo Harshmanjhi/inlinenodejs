@@ -586,7 +586,7 @@ app.listen(port, () => {
 
 // Start the bot
 async function main() {
-    await connectToDatabase();
+    await connectToMongoDB();
     bot.launch();
     console.log("Bot started");
 }
