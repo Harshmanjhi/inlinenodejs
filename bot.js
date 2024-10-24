@@ -24,7 +24,6 @@ const MUST_JOIN = "DDW_PFP_02";
 
 // Emojis and words for games
 const emojis = ["👍", "😘", "❤️", "🔥", "🥰", "🤩", "💘", "💯", "✨", "⚡️", "🏆", "🤭", "🎉"];
-const words = ["dog", "cat", "bird", /* ... other words ... */];
 
 // Rarity weights for character selection
 const RARITY_WEIGHTS = {
